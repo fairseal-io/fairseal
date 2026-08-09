@@ -1,0 +1,12 @@
+{
+  "name": "@fairseal/slot-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "tsx src/demo.ts"
+  },
+  "dependencies": {
+    "tsx": "^4.0.0"
+  }
+}

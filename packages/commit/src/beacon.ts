@@ -6,6 +6,7 @@
  */
 
 import type { BeaconConfig, BeaconRound, BeaconSource } from './types.js';
+import { sha256 } from './crypto.js';
 
 // ─── drand quicknet configuration ──────────────────────────
 
@@ -119,6 +120,129 @@ export class DrandBeaconSource implements BeaconSource {
   }
 }
 
+// ─── Offline beacon source ─────────────────────────────────
+
+/**
+ * Offline beacon source for demos and firewall environments.
+ * 
+ * Generates deterministic (but NOT cryptographically random) beacons
+ * from the round number using SHA-256. NOT suitable for production —
+ * the output is predictable from the round number alone.
+ * 
+ * Use `{ beaconId: 'offline' }` in CommitmentOptions to activate.
+ */
+export class OfflineBeaconSource implements BeaconSource {
+  readonly config: BeaconConfig;
+
+  constructor() {
+    this.config = {
+      ...DRAND_QUICKNET,
+      id: 'offline',
+      relays: [], // no network needed
+    };
+  }
+
+  getRound(unixSeconds: number): number {
+    if (unixSeconds < this.config.genesisTime) {
+      throw new Error(`Timestamp ${unixSeconds} is before genesis ${this.config.genesisTime}`);
+    }
+    return Math.floor((unixSeconds - this.config.genesisTime) / this.config.period) + 1;
+  }
+
+  getRoundTime(round: number): number {
+    if (round < 1) throw new Error(`Invalid round: ${round}`);
+    return this.config.genesisTime + (round - 1) * this.config.period;
+  }
+
+  /**
+   * Generate a deterministic beacon from the round number.
+   * randomness = SHA-256("offline-beacon:" + round)
+   * signature  = SHA-256("offline-sig:" + round)
+   * 
+   * ⚠️ NOT cryptographically secure — suitable for demos only.
+   */
+  async fetchBeacon(round: number): Promise<BeaconRound> {
+    console.warn('⚠️  Using offline beacon — not suitable for production');
+    const randomness = sha256(`offline-beacon:${round}`);
+    const signature = sha256(`offline-sig:${round}`);
+    return { round, randomness, signature };
+  }
+
+  /**
+   * Offline beacons are self-generated, so "verification" just checks
+   * the deterministic derivation is consistent.
+   */
+  async verifyBeacon(beacon: BeaconRound): Promise<boolean> {
+    const expectedRandomness = sha256(`offline-beacon:${beacon.round}`);
+    const expectedSignature = sha256(`offline-sig:${beacon.round}`);
+    return beacon.randomness === expectedRandomness && beacon.signature === expectedSignature;
+  }
+}
+
+// ─── Cached beacon wrapper ─────────────────────────────────
+
+/**
+ * Caching wrapper around any BeaconSource.
+ * 
+ * Caches fetched beacons in-memory. On fetch failure, returns the
+ * cached value if available. Helps with intermittent connectivity
+ * and avoids redundant relay requests.
+ */
+export class CachedBeaconSource implements BeaconSource {
+  readonly config: BeaconConfig;
+  private readonly inner: BeaconSource;
+  private readonly cache = new Map<number, BeaconRound>();
+
+  constructor(inner: BeaconSource) {
+    this.inner = inner;
+    this.config = inner.config;
+  }
+
+  getRound(unixSeconds: number): number {
+    return this.inner.getRound(unixSeconds);
+  }
+
+  getRoundTime(round: number): number {
+    return this.inner.getRoundTime(round);
+  }
+
+  async fetchBeacon(round: number): Promise<BeaconRound> {
+    // Return cached value if available
+    const cached = this.cache.get(round);
+
+    try {
+      const beacon = await this.inner.fetchBeacon(round);
+      this.cache.set(round, beacon);
+      return beacon;
+    } catch (err) {
+      // On failure, return cached value if we have one
+      if (cached) {
+        return cached;
+      }
+      throw err;
+    }
+  }
+
+  async verifyBeacon(beacon: BeaconRound): Promise<boolean> {
+    return this.inner.verifyBeacon(beacon);
+  }
+
+  /** Check if a round is in the cache. */
+  has(round: number): boolean {
+    return this.cache.has(round);
+  }
+
+  /** Pre-populate the cache (e.g. from stored receipts). */
+  seed(beacon: BeaconRound): void {
+    this.cache.set(beacon.round, beacon);
+  }
+
+  /** Clear all cached entries. */
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
 /**
  * Default beacon source — drand quicknet with standard relays.
  */
@@ -132,6 +256,7 @@ export function createDefaultBeacon(): BeaconSource {
  */
 const BEACON_REGISTRY = new Map<string, () => BeaconSource>([
   ['drand:quicknet', () => new DrandBeaconSource()],
+  ['offline', () => new OfflineBeaconSource()],
 ]);
 
 export function getBeaconSource(id: string): BeaconSource {

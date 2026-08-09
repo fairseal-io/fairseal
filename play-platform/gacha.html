@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairSeal · Gacha Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg-soft:#f0f7ff;--bg-card:#f8fbff;
+  --border:#e2e8f0;--text:#0f172a;--text-dim:#475569;
+  --blue:#2563eb;--blue-light:#3b82f6;--green:#059669;
+  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','Fira Code',monospace;
+  --radius:12px;
+  --common:#94a3b8;--uncommon:#059669;--rare:#2563eb;
+  --epic:#7c3aed;--legendary:#d97706;--mythic-1:#ec4899;--mythic-2:#8b5cf6;--mythic-3:#06b6d4;
+}
+body{font-family:var(--font-sans);color:var(--text);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+
+nav{display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid var(--border);font-size:14px;font-weight:500;flex-wrap:wrap}
+nav a{color:var(--text-dim);transition:color .15s}
+nav a:hover{color:var(--blue);text-decoration:none}
+nav a.brand{font-weight:700;color:var(--text);font-size:16px}
+nav a.active{color:var(--blue);font-weight:600}
+nav .sep{color:var(--border);user-select:none}
+
+.container{max-width:640px;margin:0 auto;padding:32px 24px 64px}
+h1{font-size:28px;font-weight:700;text-align:center;margin-bottom:4px}
+.page-sub{text-align:center;color:var(--text-dim);font-size:15px;margin-bottom:32px}
+
+/* Pool Toggle */
+.pool-toggle{display:flex;justify-content:center;gap:0;margin-bottom:32px;background:var(--bg-soft);border-radius:8px;padding:4px;max-width:280px;margin-left:auto;margin-right:auto}
+.pool-btn{flex:1;padding:10px 16px;border:none;background:transparent;font-family:var(--font-sans);font-size:14px;font-weight:600;color:var(--text-dim);cursor:pointer;border-radius:6px;transition:all .15s}
+.pool-btn.active{background:#fff;color:var(--blue);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+/* Pull Button */
+.pull-area{text-align:center;margin-bottom:32px}
+#pullBtn{width:160px;height:160px;border-radius:50%;border:3px solid var(--blue);background:var(--bg-soft);cursor:pointer;font-size:18px;font-weight:700;font-family:var(--font-sans);color:var(--blue);transition:all .2s;position:relative;overflow:hidden}
+#pullBtn:hover:not(:disabled){background:var(--blue);color:#fff;transform:scale(1.05);box-shadow:0 8px 32px rgba(37,99,235,.25)}
+#pullBtn:active:not(:disabled){transform:scale(0.97)}
+#pullBtn:disabled{opacity:.5;cursor:not-allowed}
+#pullBtn .label{position:relative;z-index:1}
+
+/* Chest Animation */
+@keyframes chestShake{0%,100%{transform:rotate(0)}10%{transform:rotate(-8deg)}20%{transform:rotate(8deg)}30%{transform:rotate(-6deg)}40%{transform:rotate(6deg)}50%{transform:rotate(-3deg)}60%{transform:rotate(3deg)}70%{transform:rotate(0)}}
+@keyframes chestBurst{0%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.6}100%{transform:scale(1);opacity:1}}
+#pullBtn.shaking{animation:chestShake .6s ease-in-out}
+#pullBtn.burst{animation:chestBurst .4s ease-out}
+
+/* Result Display */
+.result-area{min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-bottom:32px}
+.result-empty{color:var(--text-dim);font-size:15px;text-align:center}
+.result-card{text-align:center;opacity:0;transform:translateY(20px) scale(0.9);transition:all .4s cubic-bezier(.34,1.56,.64,1)}
+.result-card.visible{opacity:1;transform:translateY(0) scale(1)}
+.result-icon{font-size:72px;margin-bottom:12px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.15))}
+.result-name{font-size:22px;font-weight:700;margin-bottom:8px}
+.rarity-badge{display:inline-block;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#fff}
+.rarity-common .rarity-badge{background:var(--common)}
+.rarity-uncommon .rarity-badge{background:var(--uncommon)}
+.rarity-rare .rarity-badge{background:var(--rare)}
+.rarity-epic .rarity-badge{background:var(--epic)}
+.rarity-legendary .rarity-badge{background:var(--legendary)}
+.rarity-mythic .rarity-badge{background:linear-gradient(135deg,var(--mythic-1),var(--mythic-2),var(--mythic-3))}
+
+@keyframes glowPulse{0%,100%{box-shadow:0 0 20px var(--glow-color,transparent)}50%{box-shadow:0 0 40px var(--glow-color,transparent),0 0 60px var(--glow-color,transparent)}}
+.result-card.glow{animation:glowPulse 1.5s ease-in-out 2}
+.rarity-common{--glow-color:rgba(148,163,184,.3)}
+.rarity-uncommon{--glow-color:rgba(5,150,105,.3)}
+.rarity-rare{--glow-color:rgba(37,99,235,.3)}
+.rarity-epic{--glow-color:rgba(124,58,237,.4)}
+.rarity-legendary{--glow-color:rgba(217,119,6,.4)}
+.rarity-mythic{--glow-color:rgba(236,72,153,.4)}
+
+.drop-rate{color:var(--text-dim);font-size:13px;margin-top:12px;font-family:var(--font-mono)}
+.verify-link{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:13px;font-weight:600}
+
+/* Proof Panel */
+.proof-panel{background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:32px;display:none}
+.proof-panel.visible{display:block}
+.proof-panel h4{font-size:13px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.proof-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px}
+.proof-label{color:var(--text-dim);font-weight:500}
+.proof-value{font-family:var(--font-mono);font-size:12px;color:var(--text)}
+
+/* History */
+.history{margin-top:32px}
+.history h3{font-size:16px;font-weight:700;margin-bottom:12px}
+.history-list{list-style:none}
+.history-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:14px}
+.history-item:last-child{border-bottom:none}
+.history-icon{font-size:24px;flex-shrink:0}
+.history-info{flex:1}
+.history-name{font-weight:600}
+.history-rarity{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.history-rarity.common{color:var(--common)}
+.history-rarity.uncommon{color:var(--uncommon)}
+.history-rarity.rare{color:var(--rare)}
+.history-rarity.epic{color:var(--epic)}
+.history-rarity.legendary{color:var(--legendary)}
+.history-rarity.mythic{color:var(--mythic-1)}
+.history-verify{font-size:12px;color:var(--blue);cursor:pointer;flex-shrink:0}
+.no-history{color:var(--text-dim);font-size:14px;text-align:center;padding:24px}
+
+/* Error */
+.error-msg{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:12px 16px;border-radius:8px;font-size:14px;text-align:center;margin-bottom:16px;display:none}
+.error-msg.visible{display:block}
+
+footer{text-align:center;padding:32px 24px;border-top:1px solid var(--border);color:var(--text-dim);font-size:13px}
+footer a{color:var(--text-dim);font-weight:500}
+footer a:hover{color:var(--blue)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="https://fairseal.io" class="brand">🦭 FairSeal</a>
+  <span class="sep">·</span>
+  <a href="/" class="active">Play</a>
+  <a href="https://verify.fairseal.io">Verify</a>
+  <a href="https://github.com/ned-del/fairseal">GitHub</a>
+</nav>
+
+<div class="container">
+  <h1>🎁 Gacha Demo</h1>
+  <p class="page-sub">Loot box pulls with provably fair drop rates</p>
+
+  <div class="pool-toggle">
+    <button class="pool-btn active" data-pool="standard" onclick="setPool('standard')">Standard</button>
+    <button class="pool-btn" data-pool="premium" onclick="setPool('premium')">Premium</button>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="pull-area">
+    <button id="pullBtn" onclick="pull()">
+      <span class="label">🎁<br>PULL</span>
+    </button>
+  </div>
+
+  <div class="result-area">
+    <div class="result-card" id="resultCard">
+      <div class="result-icon" id="resultIcon"></div>
+      <div class="result-name" id="resultName"></div>
+      <div id="resultBadge"></div>
+      <div class="drop-rate" id="dropRate"></div>
+      <a class="verify-link" id="verifyLink" target="_blank">🔍 Verify this pull →</a>
+    </div>
+    <div class="result-empty" id="resultEmpty">Pull to reveal an item</div>
+  </div>
+
+  <div class="proof-panel" id="proofPanel">
+    <h4>Cryptographic Proof</h4>
+    <div class="proof-row"><span class="proof-label">VDF Epoch</span><span class="proof-value" id="proofEpoch">—</span></div>
+    <div class="proof-row"><span class="proof-label">Client Seed</span><span class="proof-value" id="proofSeed">—</span></div>
+    <div class="proof-row"><span class="proof-label">RNG Value</span><span class="proof-value" id="proofRng">—</span></div>
+    <div class="proof-row"><span class="proof-label">Verify</span><span class="proof-value"><a id="proofVerify" target="_blank" style="font-size:12px">🔍 Open →</a></span></div>
+  </div>
+
+  <div class="history">
+    <h3>Pull History</h3>
+    <ul class="history-list" id="historyList">
+      <li class="no-history" id="noHistory">No pulls yet</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  🦭 FairSeal · Provably fair infrastructure ·
+  <a href="https://fairseal.io">fairseal.io</a> ·
+  <a href="https://verify.fairseal.io">verify.fairseal.io</a>
+</footer>
+
+<script>
+const API = 'https://api.fairseal.io';
+let currentPool = 'standard';
+let pulling = false;
+const history = [];
+
+async function sha256(input) {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function openVerify(gameId) {
+  window.open('https://verify.fairseal.io/' + gameId, '_blank');
+}
+
+function setPool(pool) {
+  currentPool = pool;
+  document.querySelectorAll('.pool-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.pool === pool);
+  });
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 5000);
+}
+
+async function pull() {
+  if (pulling) return;
+  pulling = true;
+  const btn = document.getElementById('pullBtn');
+  btn.disabled = true;
+
+  // Hide previous result
+  document.getElementById('resultCard').classList.remove('visible', 'glow');
+  document.getElementById('resultEmpty').style.display = 'none';
+  document.getElementById('proofPanel').classList.remove('visible');
+
+  // Chest shake animation
+  btn.classList.add('shaking');
+
+  try {
+    const res = await fetch(API + '/api/v1/games/gacha/pull', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pool_id: currentPool, amount: 1 })
+    });
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+
+    // Wait for shake to finish
+    await new Promise(r => setTimeout(r, 600));
+    btn.classList.remove('shaking');
+    btn.classList.add('burst');
+
+    const outcome = data.result.outcome;
+    const rarity = outcome.rarity;
+    const proof = data.result.proof;
+    const verifyUrl = data.result.verifyUrl;
+
+    // Show result
+    const card = document.getElementById('resultCard');
+    card.className = 'result-card rarity-' + rarity;
+    document.getElementById('resultIcon').textContent = outcome.icon;
+    document.getElementById('resultName').textContent = outcome.item;
+    document.getElementById('resultBadge').innerHTML = '<span class="rarity-badge">' + rarity + '</span>';
+    document.getElementById('dropRate').textContent = 'Drop Rate: ' + outcome.dropRate;
+    const vLink = document.getElementById('verifyLink');
+    vLink.href = verifyUrl;
+    vLink.style.display = 'inline-flex';
+
+    setTimeout(() => {
+      card.classList.add('visible');
+      setTimeout(() => card.classList.add('glow'), 100);
+    }, 200);
+
+    // Proof panel
+    if (proof) {
+      document.getElementById('proofEpoch').textContent = proof.vdfEpoch || '—';
+      document.getElementById('proofSeed').textContent = proof.clientSeed ? String(proof.clientSeed).slice(0, 8) + '…' : '—';
+      document.getElementById('proofRng').textContent = proof.rngValue ? String(proof.rngValue).slice(0, 16) + '…' : '—';
+      const pv = document.getElementById('proofVerify');
+      pv.href = verifyUrl;
+      document.getElementById('proofPanel').classList.add('visible');
+    }
+
+    // Add to history
+    history.unshift({ icon: outcome.icon, name: outcome.item, rarity, gameId: data.game_id, verifyUrl });
+    renderHistory();
+
+    setTimeout(() => btn.classList.remove('burst'), 400);
+
+  } catch (e) {
+    btn.classList.remove('shaking');
+    showError('API temporarily unavailable');
+    document.getElementById('resultEmpty').style.display = '';
+  }
+
+  btn.disabled = false;
+  pulling = false;
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  document.getElementById('noHistory').style.display = history.length ? 'none' : '';
+  const items = history.slice(0, 20);
+  // Remove old items (keep noHistory)
+  list.querySelectorAll('.history-item').forEach(el => el.remove());
+  items.forEach(h => {
+    const li = document.createElement('li');
+    li.className = 'history-item';
+    li.innerHTML = '<span class="history-icon">' + h.icon + '</span>'
+      + '<div class="history-info"><span class="history-name">' + h.name + '</span> '
+      + '<span class="history-rarity ' + h.rarity + '">' + h.rarity + '</span></div>'
+      + '<a class="history-verify" href="' + h.verifyUrl + '" target="_blank">Verify</a>';
+    list.insertBefore(li, list.firstChild.nextSibling || null);
+  });
+}
+</script>
+</body>
+</html>

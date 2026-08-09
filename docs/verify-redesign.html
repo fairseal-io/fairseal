@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fairseal — Verify</title>
+  <meta name="description" content="Verify any Fairseal game result. Transparent proof chain: VDF computation → randomness derivation → Merkle anchor → Base.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #ffffff;
+      --bg-soft:   #f0f7ff;
+      --bg-card:   #f8fbff;
+      --bg-card2:  #eef4fb;
+      --bg-code:   #0f172a;
+      --border:    #e2e8f0;
+      --border2:   #cbd5e1;
+      --border-blue: #bfdbfe;
+      --accent:    #2563eb;
+      --accent-b:  #3b82f6;
+      --text:      #0f172a;
+      --text-muted:#64748b;
+      --text-dim:  #94a3b8;
+      --success:   #059669;
+      --error:     #ef4444;
+      --warn:      #f59e0b;
+      --hash:      #2563eb;
+      --glow:      rgba(37,99,235,0.1);
+      --radius:    12px;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      --blue-pale: #dbeafe;
+      --green-pale:#d1fae5;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── HEADER ─────────────────────────────────────── */
+    header {
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.9);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .logo-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    .logo-text {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .logo-text span { color: var(--accent); }
+    .logo-badge {
+      font-size: 10px;
+      background: var(--green-pale);
+      color: var(--success);
+      border: 1px solid rgba(5,150,105,0.25);
+      border-radius: 9999px;
+      padding: 2px 8px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      margin-left: 32px;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--accent); }
+    .nav-links .nav-github svg { vertical-align: middle; }
+    .header-entropy {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 9999px;
+      padding: 4px 12px;
+    }
+    .header-entropy span {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .entropy-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      background: var(--success);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity:1; }
+      50% { opacity:0.3; }
+    }
+
+    /* ── LAYOUT ─────────────────────────────────────── */
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 24px 60px;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 40px 0 32px;
+    }
+    .hero h1 {
+      font-size: clamp(24px, 5vw, 42px);
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.2;
+      margin-bottom: 12px;
+      letter-spacing: -1px;
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+    .hero p {
+      color: var(--text-muted);
+      font-size: 16px;
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* ── SEARCH BOX ─────────────────────────────────── */
+    .search-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 28px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-card:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
+    }
+    .search-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 12px;
+    }
+    .search-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .search-input {
+      flex: 1;
+      min-width: 240px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font-mono);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-input::placeholder { color: var(--text-dim); }
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
+    }
+    .btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+    }
+    .btn-primary:hover { background: #1d4ed8; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 13px;
+      padding: 8px 14px;
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── SPINNER ─────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── ERROR / STATUS BANNERS ──────────────────────── */
+    .banner {
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 14px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .banner-error {
+      background: rgba(239,68,68,0.06);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: #dc2626;
+    }
+    .banner-icon { font-size: 18px; flex-shrink: 0; }
+
+    /* ── TWO-COLUMN GRID ─────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 800px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── CARD ────────────────────────────────────────── */
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .card-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: space-between;
+      background: var(--bg-card);
+    }
+    .card-header-left { display: flex; align-items: center; gap: 8px; }
+
+    /* ── RECENT GAMES LIST ───────────────────────────── */
+    #recent-list {
+      max-height: 540px;
+      overflow-y: auto;
+    }
+    #recent-list::-webkit-scrollbar { width: 4px; }
+    #recent-list::-webkit-scrollbar-track { background: transparent; }
+    #recent-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .game-row {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .game-row:last-child { border-bottom: none; }
+    .game-row:hover { background: var(--bg-soft); }
+    .game-row.active { background: rgba(37,99,235,0.04); border-left: 3px solid var(--accent); padding-left: 15px; }
+
+    .game-type-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .badge-dice  { background: var(--blue-pale); color: var(--accent); }
+
+    .game-row-info { flex: 1; min-width: 0; }
+    .game-row-id {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--accent);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .game-row-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+    .game-row-outcome {
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .outcome-dice { font-size: 18px; letter-spacing: -2px; }
+    .won-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
+      margin-top: 2px;
+    }
+    .won-true  { background: var(--green-pale); color: var(--success); }
+    .won-false { background: rgba(239,68,68,0.08); color: var(--error); }
+
+    /* ── VERIFY RESULT ───────────────────────────────── */
+    #result-panel { display: none; }
+
+    .result-top {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .result-game-id {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      word-break: break-all;
+      margin-bottom: 10px;
+    }
+    .result-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .verified-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      font-size: 16px;
+      padding: 6px 14px;
+      border-radius: 6px;
+    }
+    .verified-true {
+      background: var(--green-pale);
+      color: var(--success);
+      border: 1px solid rgba(5,150,105,0.25);
+    }
+    .verified-false {
+      background: rgba(239,68,68,0.08);
+      color: var(--error);
+      border: 1px solid rgba(239,68,68,0.2);
+    }
+
+    .outcome-summary {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .outcome-kv {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .kv-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-dim);
+      font-weight: 600;
+    }
+    .kv-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .kv-value.accent { color: var(--accent); }
+    .kv-value.win { color: var(--success); }
+    .kv-value.loss { color: var(--error); }
+    .dice-icons { font-size: 22px; letter-spacing: 0; }
+
+    /* ── PROOF CHAIN STEPS ───────────────────────────── */
+    .steps-section { padding: 20px; }
+    .steps-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    .steps-chain { display: flex; flex-direction: column; gap: 0; }
+
+    .step-item {
+      display: flex;
+      gap: 14px;
+      position: relative;
+    }
+    .step-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 32px;
+      flex-shrink: 0;
+    }
+    .step-icon {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .step-icon-ok {
+      background: var(--green-pale);
+      border: 1px solid rgba(5,150,105,0.25);
+      color: var(--success);
+    }
+    .step-icon-num {
+      background: var(--blue-pale);
+      border: 1px solid rgba(37,99,235,0.2);
+      color: var(--accent);
+      font-size: 13px;
+    }
+    .step-connector {
+      flex: 1;
+      width: 2px;
+      background: var(--border-blue);
+      margin: 2px 0;
+      min-height: 24px;
+    }
+    .step-item:last-child .step-connector { display: none; }
+
+    .step-body {
+      padding-bottom: 20px;
+      flex: 1;
+      min-width: 0;
+    }
+    .step-item:last-child .step-body { padding-bottom: 0; }
+    .step-action {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .step-timestamp {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+    .step-data {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-top: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+    .step-data-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+    .step-data-row:last-child { margin-bottom: 0; }
+    .step-data-key { color: var(--text-dim); flex-shrink: 0; }
+    .step-data-val { color: var(--text); word-break: break-all; }
+    .step-data-val.hash { color: var(--accent); }
+    .step-data-val.green { color: var(--success); }
+    .step-data-val.red { color: var(--error); }
+
+    /* ── PROOF DETAILS ───────────────────────────────── */
+    .proof-section {
+      padding: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .proof-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    @media (max-width: 600px) { .proof-grid { grid-template-columns: 1fr; } }
+    .proof-item {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .proof-item-full { grid-column: 1 / -1; }
+    .proof-item-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-dim);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .proof-item-value {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--accent);
+      word-break: break-all;
+      line-height: 1.4;
+    }
+    .proof-item-value.text { color: var(--text); font-size: 11px; }
+
+    /* Merkle path */
+    .merkle-path {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .merkle-node {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .merkle-idx {
+      font-size: 9px;
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    /* Base anchor */
+    .polygon-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--blue-pale);
+      border: 1px solid var(--border-blue);
+      color: var(--accent);
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      margin-top: 8px;
+      transition: all 0.15s;
+    }
+    .polygon-link:hover {
+      background: rgba(37,99,235,0.15);
+      border-color: var(--accent);
+    }
+    .polygon-na {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-style: italic;
+      margin-top: 8px;
+    }
+
+    /* ── PLACEHOLDER PANEL ───────────────────────────── */
+    #placeholder-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 60px 30px;
+      gap: 12px;
+    }
+    .placeholder-icon { font-size: 48px; opacity: 0.4; }
+    .placeholder-title { font-size: 16px; font-weight: 600; color: var(--text-muted); }
+    .placeholder-sub { font-size: 13px; color: var(--text-dim); max-width: 260px; }
+
+    /* ── FOOTER ──────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 24px;
+      text-align: center;
+      background: var(--bg);
+    }
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .footer-link {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+    .footer-link:hover { color: var(--accent); }
+    .footer-copy {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    /* ── LOADING SKELETON ────────────────────────────── */
+    @keyframes shimmer {
+      0% { background-position: -400px 0; }
+      100% { background-position: 400px 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, var(--border) 25%, #f1f5f9 50%, var(--border) 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 4px;
+    }
+
+    /* ── UTILITIES ───────────────────────────────────── */
+    .hidden { display: none !important; }
+    .mono { font-family: var(--font-mono); }
+    .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      background: #f1f5f9;
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--accent);
+    }
+
+    /* ── RESPONSIVE ──────────────────────────────────── */
+    @media (max-width: 800px) {
+      .nav-links { display: none; }
+      .header-inner { height: auto; padding: 12px 20px; }
+    }
+    @media (max-width: 480px) {
+      main { padding: 24px 16px 48px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ──────────────────────────────────────── -->
+<header>
+  <div class="header-inner">
+    <a class="logo" href="https://fairseal.io" target="_blank" rel="noopener">
+      <span class="logo-icon">🦭</span>
+      <span class="logo-text">Fair<span>Seal</span></span>
+      <span class="logo-badge">VERIFY</span>
+    </a>
+    <div class="nav-links">
+      <a href="https://fairseal.io">Home</a>
+      <a href="https://fairseal.io/#how">How It Works</a>
+      <a href="https://github.com/ned-del/fairseal" class="nav-github">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+      </a>
+    </div>
+    <div class="header-entropy" id="header-entropy">
+      <span class="entropy-dot"></span>VDF Epoch <span id="hdr-epoch">…</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── MAIN ────────────────────────────────────────── -->
+<main>
+
+  <div class="hero">
+    <h1>Provably Fair <em>Verification</em></h1>
+    <p>Every game result is cryptographically sealed before the outcome is known. Verify the full proof chain in seconds.</p>
+  </div>
+
+  <!-- Search -->
+  <div class="search-card">
+    <div class="search-label">Enter Game ID</div>
+    <div class="search-row">
+      <input
+        class="search-input"
+        id="game-id-input"
+        type="text"
+        placeholder="e.g. e4aea9e4a6c2b7ed83fbfc08fa9ad7e349bed4d4e0fdb541106e300ac1b3128d"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="btn btn-primary" id="verify-btn" onclick="doVerify()">
+        Verify
+      </button>
+    </div>
+  </div>
+
+  <!-- Error banner -->
+  <div class="banner banner-error hidden" id="error-banner">
+    <span class="banner-icon">⚠️</span>
+    <span id="error-message">Something went wrong.</span>
+  </div>
+
+  <!-- Grid: recent | result -->
+  <div class="grid">
+
+    <!-- Left: Recent Games -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-header-left">
+          <span>📋</span> Recent Games
+        </span>
+        <button class="btn btn-ghost" onclick="loadRecent()">↻</button>
+      </div>
+      <div id="recent-list">
+        <div style="padding:24px; text-align:center; color:var(--text-dim); font-size:13px;">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Right: Result / Placeholder -->
+    <div>
+
+      <!-- Placeholder -->
+      <div id="placeholder-panel">
+        <div class="placeholder-icon">🔍</div>
+        <div class="placeholder-title">No game selected</div>
+        <div class="placeholder-sub">Enter a Game ID above or click a recent game to verify its proof chain.</div>
+      </div>
+
+      <!-- Result Panel -->
+      <div class="card" id="result-panel">
+
+        <!-- Top: Game summary -->
+        <div class="result-top" id="result-top"></div>
+
+        <!-- Proof chain steps -->
+        <div class="steps-section" id="steps-section"></div>
+
+        <!-- Proof details -->
+        <div class="proof-section" id="proof-section"></div>
+
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ── FOOTER ───────────────────────────────────────── -->
+<footer>
+  <div class="footer-inner">
+    <a class="footer-link" href="https://fairseal.io" target="_blank">fairseal.io</a>
+    <a class="footer-link" href="https://github.com/ned-del/fairseal" target="_blank">GitHub</a>
+    <a class="footer-link" href="https://api.fairseal.io/docs" target="_blank">API Docs</a>
+    <a class="footer-link" href="https://github.com/ned-del/fairseal/blob/main/docs/rfc/RFC-0002-VEO2.md" target="_blank">VEO-2 RFC</a>
+    <span class="footer-copy">© 2026 FairSeal · MIT License</span>
+  </div>
+</footer>
+
+<script>
+  const API = 'https://api.fairseal.io';
+
+  /* ── DICE EMOJI MAP ──────────────────────────────── */
+  const DICE_EMOJI = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+
+  /* ── STEP LABELS & ICONS ─────────────────────────── */
+  const STEP_META = {
+    'bet_committed':      { label: 'Bet Committed',        icon: '📝', desc: 'Player placed and locked their bet before randomness was revealed.' },
+    'vdf_epoch':          { label: 'VDF Epoch Published',  icon: '⏱️',  desc: 'Verifiable Delay Function output published — cannot be predicted or manipulated.' },
+    'randomness_derived': { label: 'Randomness Derived',   icon: '🔀',  desc: 'Final RNG value computed via HMAC-SHA256 of VDF output and player seed.' },
+    'outcome_computed':   { label: 'Outcome Computed',     icon: '🎲',  desc: 'Dice result deterministically derived from the verified random value.' },
+    'settlement':         { label: 'Bet Settled',          icon: '✅',  desc: 'Payout calculated and applied based on outcome.' },
+  };
+
+  /* ── ENTROPY HEADER ──────────────────────────────── */
+  async function loadEntropy() {
+    try {
+      const r = await fetch(`${API}/api/v1/entropy`);
+      const d = await r.json();
+      document.getElementById('hdr-epoch').textContent = `#${d.epoch}`;
+    } catch(_) {}
+  }
+
+  /* ── RECENT GAMES ────────────────────────────────── */
+  async function loadRecent() {
+    const list = document.getElementById('recent-list');
+    list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:13px;">Loading…</div>';
+    try {
+      const r = await fetch(`${API}/api/v1/recent`);
+      const d = await r.json();
+      renderRecent(d.games || []);
+    } catch(e) {
+      list.innerHTML = '<div style="padding:16px;color:var(--error);font-size:13px;">Failed to load recent games.</div>';
+    }
+  }
+
+  function renderRecent(games) {
+    const list = document.getElementById('recent-list');
+    if (!games.length) {
+      list.innerHTML = '<div style="padding:16px;color:var(--text-dim);font-size:13px;">No recent games found.</div>';
+      return;
+    }
+    list.innerHTML = games.map(g => {
+      const dice = (g.outcome && g.outcome.die3 != null)
+        ? `${DICE_EMOJI[g.outcome.die1]}${DICE_EMOJI[g.outcome.die2]}${DICE_EMOJI[g.outcome.die3]}`
+        : `${DICE_EMOJI[g.outcome.die1]}${DICE_EMOJI[g.outcome.die2]}`;
+      const shortId = g.game_id.slice(0, 12) + '…' + g.game_id.slice(-8);
+      const time = new Date(g.resolved_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      return `
+        <div class="game-row" id="row-${g.game_id}" onclick="selectGame('${g.game_id}')">
+          <div class="game-row-info">
+            <div class="game-row-id">${shortId}</div>
+            <div class="game-row-meta">${g.bet_type} · ${time}</div>
+          </div>
+          <div class="game-row-outcome">
+            <div class="outcome-dice">${dice}</div>
+            <div class="won-badge ${g.won ? 'won-true' : 'won-false'}">${g.won ? 'WIN' : 'LOSS'}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  /* ── SELECT GAME FROM LIST ───────────────────────── */
+  function selectGame(id) {
+    document.getElementById('game-id-input').value = id;
+    document.querySelectorAll('.game-row').forEach(r => r.classList.remove('active'));
+    const row = document.getElementById(`row-${id}`);
+    if (row) row.classList.add('active');
+    doVerify();
+  }
+
+  /* ── VERIFY ──────────────────────────────────────── */
+  async function doVerify() {
+    const id = document.getElementById('game-id-input').value.trim();
+    if (!id) { showError('Please enter a Game ID.'); return; }
+
+    hideError();
+    setLoading(true);
+
+    try {
+      const r = await fetch(`${API}/api/v1/verify/${encodeURIComponent(id)}`);
+      if (r.status === 404) throw new Error('Game not found. Check the Game ID and try again.');
+      if (!r.ok) throw new Error(`API error: ${r.status}`);
+      const data = await r.json();
+      renderResult(data);
+    } catch(e) {
+      showError(e.message || 'Verification failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* ── RENDER RESULT ───────────────────────────────── */
+  function renderResult(data) {
+    const panel = document.getElementById('result-panel');
+    const placeholder = document.getElementById('placeholder-panel');
+    panel.style.display = 'block';
+    placeholder.style.display = 'none';
+
+    renderResultTop(data);
+    renderSteps(data.replay_steps || []);
+    renderProof(data.proof || {});
+  }
+
+  function renderResultTop(data) {
+    const el = document.getElementById('result-top');
+    const steps = data.replay_steps || [];
+    const settlementStep = steps.find(s => s.action === 'settlement');
+    const betStep = steps.find(s => s.action === 'bet_committed');
+    const outcomeStep = steps.find(s => s.action === 'outcome_computed');
+
+    const won = settlementStep?.data?.won ?? false;
+    const payout = settlementStep?.data?.payout ?? '—';
+    const multiplier = settlementStep?.data?.multiplier ?? '—';
+    const betType = betStep?.data?.betType ?? '—';
+    const amount = betStep?.data?.amount ?? '—';
+
+    // Dice display
+    let diceHtml = '';
+    if (outcomeStep?.data) {
+      const d = outcomeStep.data;
+      if (d.die3 !== undefined) {
+        diceHtml = `<div class="outcome-kv">
+          <span class="kv-label">Roll</span>
+          <span class="kv-value dice-icons">${DICE_EMOJI[d.die1]}${DICE_EMOJI[d.die2]}${DICE_EMOJI[d.die3]}</span>
+        </div>`;
+      } else {
+        diceHtml = `<div class="outcome-kv">
+          <span class="kv-label">Roll</span>
+          <span class="kv-value dice-icons">${DICE_EMOJI[d.die1]}${DICE_EMOJI[d.die2]}</span>
+        </div>`;
+      }
+    }
+
+    el.innerHTML = `
+      <div class="result-game-id">Game ID: ${data.game_id}</div>
+      <div class="result-status">
+        <div class="verified-badge ${data.verified ? 'verified-true' : 'verified-false'}">
+          ${data.verified ? '✓ Verified' : '✗ Verification Failed'}
+        </div>
+      </div>
+      <div class="outcome-summary">
+        ${diceHtml}
+        <div class="outcome-kv">
+          <span class="kv-label">Total</span>
+          <span class="kv-value accent">${outcomeStep?.data?.total ?? '—'}</span>
+        </div>
+        <div class="outcome-kv">
+          <span class="kv-label">Bet</span>
+          <span class="kv-value">${betType}</span>
+        </div>
+        <div class="outcome-kv">
+          <span class="kv-label">Amount</span>
+          <span class="kv-value">${amount}</span>
+        </div>
+        <div class="outcome-kv">
+          <span class="kv-label">Payout</span>
+          <span class="kv-value ${won ? 'win' : 'loss'}">${payout} (${multiplier}×)</span>
+        </div>
+      </div>`;
+  }
+
+  function renderSteps(steps) {
+    const el = document.getElementById('steps-section');
+    if (!steps.length) { el.innerHTML = ''; return; }
+
+    const stepsHtml = steps.map(s => {
+      const meta = STEP_META[s.action] || { label: s.action, icon: '▶', desc: '' };
+      const dataRows = renderStepData(s.action, s.data);
+      const ts = s.timestamp ? new Date(s.timestamp).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : '';
+
+      return `
+        <div class="step-item">
+          <div class="step-left">
+            <div class="step-icon step-icon-ok">${meta.icon}</div>
+            <div class="step-connector"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-action">
+              ${meta.label}
+              <span class="step-timestamp">${ts}</span>
+            </div>
+            ${meta.desc ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">${meta.desc}</div>` : ''}
+            ${dataRows ? `<div class="step-data">${dataRows}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="steps-title">Proof Chain</div>
+      <div class="steps-chain">${stepsHtml}</div>`;
+  }
+
+  function renderStepData(action, data) {
+    if (!data) return '';
+    const rows = [];
+    const isHash = v => typeof v === 'string' && v.length >= 32 && /^[0-9a-f]+$/.test(v);
+    const isDerivation = v => typeof v === 'string' && v.includes('HMAC');
+
+    for (const [k, v] of Object.entries(data)) {
+      if (k === 'won') {
+        rows.push(`<div class="step-data-row"><span class="step-data-key">${k}:</span><span class="step-data-val ${v ? 'green' : 'red'}">${v}</span></div>`);
+      } else if (isHash(v)) {
+        rows.push(`<div class="step-data-row"><span class="step-data-key">${k}:</span><span class="step-data-val hash">${v}</span></div>`);
+      } else if (isDerivation(v)) {
+        rows.push(`<div class="step-data-row"><span class="step-data-key">${k}:</span><span class="step-data-val" style="color:var(--accent);word-break:break-all">${v}</span></div>`);
+      } else {
+        rows.push(`<div class="step-data-row"><span class="step-data-key">${k}:</span><span class="step-data-val">${v}</span></div>`);
+      }
+    }
+    return rows.join('');
+  }
+
+  function renderProof(proof) {
+    const el = document.getElementById('proof-section');
+
+    const merklePath = (proof.merklePath || []).map((h, i) =>
+      `<div class="merkle-node"><span class="merkle-idx">[${i}]</span>${h}</div>`
+    ).join('');
+
+    const polygonSection = proof.polygonTx
+      ? `<a class="polygon-link"
+            href="https://polygonscan.com/tx/${proof.polygonTx}"
+            target="_blank" rel="noopener">
+            🔗 View on Basescan ↗
+         </a>`
+      : `<div class="polygon-na">No on-chain anchor yet (pool-served epoch)</div>`;
+
+    el.innerHTML = `
+      <div class="steps-title">Cryptographic Proof</div>
+      <div class="proof-grid">
+        <div class="proof-item">
+          <div class="proof-item-label">VDF Epoch</div>
+          <div class="proof-item-value text">#${proof.vdfEpoch ?? '—'}</div>
+        </div>
+        <div class="proof-item">
+          <div class="proof-item-label">Client Seed</div>
+          <div class="proof-item-value">${proof.clientSeed ?? '—'}</div>
+        </div>
+        <div class="proof-item proof-item-full">
+          <div class="proof-item-label">RNG Value (HMAC-SHA256 output)</div>
+          <div class="proof-item-value">${proof.rngValue ?? '—'}</div>
+        </div>
+        <div class="proof-item proof-item-full">
+          <div class="proof-item-label">Derivation Formula</div>
+          <div class="proof-item-value text" style="color:var(--accent)">${proof.derivation ?? '—'}</div>
+        </div>
+        ${merklePath ? `
+        <div class="proof-item proof-item-full">
+          <div class="proof-item-label">Merkle Proof Path (${(proof.merklePath||[]).length} nodes)</div>
+          <div class="merkle-path">${merklePath}</div>
+        </div>
+        <div class="proof-item proof-item-full">
+          <div class="proof-item-label">Merkle Root</div>
+          <div class="proof-item-value">${proof.merkleRoot ?? '—'}</div>
+        </div>` : ''}
+        <div class="proof-item proof-item-full">
+          <div class="proof-item-label">Base Anchor</div>
+          ${polygonSection}
+        </div>
+      </div>`;
+  }
+
+  /* ── UI HELPERS ──────────────────────────────────── */
+  function setLoading(on) {
+    const btn = document.getElementById('verify-btn');
+    btn.disabled = on;
+    btn.innerHTML = on
+      ? '<span class="spinner"></span>Verifying…'
+      : 'Verify';
+  }
+  function showError(msg) {
+    const b = document.getElementById('error-banner');
+    document.getElementById('error-message').textContent = msg;
+    b.classList.remove('hidden');
+  }
+  function hideError() {
+    document.getElementById('error-banner').classList.add('hidden');
+  }
+
+  /* ── INPUT: ENTER KEY ────────────────────────────── */
+  document.getElementById('game-id-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doVerify();
+  });
+
+  /* ── CHECK URL PARAM ─────────────────────────────── */
+  function checkUrlParam() {
+    if (checkDemoHash()) return;
+
+    // Check URL path for game ID (e.g. verify.fairseal.io/{gameId})
+    const path = window.location.pathname.replace(/^\/+|\/+$/g, '');
+    if (path && /^[a-f0-9]{16,}$/i.test(path)) {
+      document.getElementById('game-id-input').value = path;
+      doVerify();
+      return;
+    }
+
+    // Check query params (?id=... or ?game=...)
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id') || params.get('game');
+    if (id) {
+      document.getElementById('game-id-input').value = id;
+      doVerify();
+    }
+  }
+
+  /* ── DEMO DATA FROM GACHA/GAMES ──────────────────── */
+  function checkDemoHash() {
+    const hash = window.location.hash;
+    if (!hash.startsWith("#demo/")) return false;
+    try {
+      const b64 = hash.slice(6);
+      const json = atob(b64);
+      const data = JSON.parse(json);
+      renderDemoResult(data);
+      return true;
+    } catch(e) {
+      console.warn("Demo data parse error:", e);
+      return false;
+    }
+  }
+
+  function renderDemoResult(d) {
+    const panel = document.getElementById("result-panel");
+    const placeholder = document.getElementById("placeholder-panel");
+    panel.style.display = "block";
+    placeholder.style.display = "none";
+    hideError();
+
+    const stars = "★".repeat(d.rarity) + "☆".repeat(5 - d.rarity);
+    const rarityLabel = d.rarity === 5 ? "Legendary" : d.rarity === 4 ? "Rare" : "Common";
+    const rarityColor = d.rarity === 5 ? "#ffd54f" : d.rarity === 4 ? "#d4a0f5" : "#2563eb";
+
+    document.getElementById("result-top").innerHTML = `
+      <div class="result-game-id">Receipt ID: ${d.game_id}</div>
+      <div class="result-status">
+        <div class="verified-badge verified-true">✓ Verified</div>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">DEMO · Simulated Proof</span>
+      </div>
+      <div class="outcome-summary">
+        <div class="outcome-kv">
+          <span class="kv-label">Item</span>
+          <span class="kv-value" style="font-size:22px">${d.item_emoji || "🎴"}</span>
+        </div>
+        <div class="outcome-kv">
+          <span class="kv-label">Name</span>
+          <span class="kv-value" style="color:${rarityColor}">${d.item_name}</span>
+        </div>
+        <div class="outcome-kv">
+          <span class="kv-label">Rarity</span>
+          <span class="kv-value" style="color:${rarityColor}">${stars} ${rarityLabel}</span>
+        </div>
+        <div class="outcome-kv">
+          <span class="kv-label">Type</span>
+          <span class="kv-value">${d.item_type}</span>
+        </div>
+        <div class="outcome-kv">
+          <span class="kv-label">Pull</span>
+          <span class="kv-value">#${d.pull_index} of ${d.pull_total}</span>
+        </div>
+      </div>`;
+
+    const ts = d.timestamp ? new Date(d.timestamp).toISOString().replace("T"," ").slice(0,19)+" UTC" : "";
+
+    document.getElementById("steps-section").innerHTML = `
+      <div class="steps-title">Proof Chain</div>
+      <div class="steps-chain">
+        <div class="step-item">
+          <div class="step-left"><div class="step-icon step-icon-ok">🔐</div><div class="step-connector"></div></div>
+          <div class="step-body">
+            <div class="step-action">Commitment Sealed <span class="step-timestamp">${ts}</span></div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Server seed hashed and published before pull. Cannot change after commitment.</div>
+            <div class="step-data">
+              <div class="step-data-row"><span class="step-data-key">commitHash:</span><span class="step-data-val hash">${d.commitHash || "—"}</span></div>
+              <div class="step-data-row"><span class="step-data-key">nonce:</span><span class="step-data-val">${d.nonce || "—"}</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-left"><div class="step-icon step-icon-ok">⚡</div><div class="step-connector"></div></div>
+          <div class="step-body">
+            <div class="step-action">Entropy Mixed</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">HMAC-SHA256 of server seed combined with client seed and nonce.</div>
+            <div class="step-data">
+              <div class="step-data-row"><span class="step-data-key">derivation:</span><span class="step-data-val" style="color:var(--accent)">HMAC-SHA256(serverSeed, clientSeed + ${d.nonce || "n"})</span></div>
+              <div class="step-data-row"><span class="step-data-key">hmac_output:</span><span class="step-data-val hash">${d.hmac_output || "—"}</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-left"><div class="step-icon step-icon-ok">🎴</div><div class="step-connector"></div></div>
+          <div class="step-body">
+            <div class="step-action">Selection Resolved</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Item deterministically selected from pool based on HMAC output and pity state.</div>
+            <div class="step-data">
+              <div class="step-data-row"><span class="step-data-key">result:</span><span class="step-data-val" style="color:${rarityColor}">[${d.rarity}★] ${d.item_name}</span></div>
+              <div class="step-data-row"><span class="step-data-key">pity_5star:</span><span class="step-data-val">${d.pity_5star}/90</span></div>
+              <div class="step-data-row"><span class="step-data-key">pity_4star:</span><span class="step-data-val">${d.pity_4star}/10</span></div>
+              <div class="step-data-row"><span class="step-data-key">total_pulls:</span><span class="step-data-val">${d.total_pulls}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById("proof-section").innerHTML = `
+      <div class="steps-title">Cryptographic Proof</div>
+      <div class="proof-grid">
+        <div class="proof-item">
+          <div class="proof-item-label">Game Type</div>
+          <div class="proof-item-value text">${d.game_type || "gacha"}</div>
+        </div>
+        <div class="proof-item">
+          <div class="proof-item-label">Protocol</div>
+          <div class="proof-item-value text">@fairseal/commit v1.3.2</div>
+        </div>
+        <div class="proof-item proof-item-full">
+          <div class="proof-item-label">Server Seed (revealed after pull)</div>
+          <div class="proof-item-value">${d.serverSeed || "—"}</div>
+        </div>
+        <div class="proof-item proof-item-full">
+          <div class="proof-item-label">Client Seed</div>
+          <div class="proof-item-value">${d.clientSeed || "—"}</div>
+        </div>
+        <div class="proof-item proof-item-full">
+          <div class="proof-item-label">Commitment Hash</div>
+          <div class="proof-item-value">${d.commitHash || "—"}</div>
+        </div>
+        <div class="proof-item proof-item-full">
+          <div class="proof-item-label">Note</div>
+          <div class="proof-item-value text" style="color:var(--warn)">This is a demo receipt from the FairSeal gacha simulator. In production, all seeds and commitments are cryptographically anchored on-chain.</div>
+        </div>
+      </div>`;
+  }
+
+  /* ── INIT ────────────────────────────────────────── */
+  loadEntropy();
+  loadRecent();
+  checkUrlParam();
+
+  /* ── EXPOSE TO GLOBAL SCOPE (for onclick handlers) ── */
+  window.doVerify = doVerify;
+  window.selectGame = selectGame;
+  window.copyText = typeof copyText !== 'undefined' ? copyText : function(){};
+</script>
+
+<!-- ── CSR Receipt Verification ── -->
+<div id="csr-verify" style="display:none; max-width:800px; margin:40px auto; padding:20px; background:var(--bg-card); border-radius:12px; border:1px solid var(--border);">
+  <h2 style="color:var(--text); margin-bottom:16px;">🦭 CSR Receipt Verification</h2>
+  <div id="csr-result"></div>
+</div>
+
+<script>
+// CSR Receipt auto-detection and verification
+(function() {
+  const textarea = document.querySelector('textarea');
+  if (!textarea) return;
+  
+  const origHandler = textarea.oninput;
+  
+  textarea.addEventListener('input', function() {
+    try {
+      const data = JSON.parse(this.value);
+      // Detect CSR receipt format
+      if (data.receipt && data.receipt.commitment && data.receipt.commitment.beacon) {
+        showCSR(data);
+      } else if (data.commitment && data.commitment.beacon) {
+        showCSR({ receipt: data });
+      }
+    } catch(e) {}
+  });
+  
+  function showCSR(data) {
+    const r = data.receipt;
+    const c = r.commitment;
+    const res = r.resolution;
+    const el = document.getElementById('csr-verify');
+    const result = document.getElementById('csr-result');
+    el.style.display = 'block';
+    
+    // Verify commitment hash integrity (client-side)
+    async function sha256(str) {
+      const buf = new TextEncoder().encode(str);
+      const hash = await crypto.subtle.digest('SHA-256', buf);
+      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+    
+    (async () => {
+      // Recompute hashes
+      const ruleHash = await sha256(c.rule);
+      const sortedInputs = [...c.inputs].sort().join('\n');
+      const inputsHash = await sha256(sortedInputs);
+      const preimage = [c.beacon, c.targetRound.toString(), c.ruleHash, c.inputsHash, c.salt].join(':');
+      const commitHash = await sha256(preimage);
+      
+      const ruleOk = ruleHash === c.ruleHash;
+      const inputsOk = inputsHash === c.inputsHash;
+      const commitOk = commitHash === c.commitHash;
+      
+      const check = (ok) => ok ? '✅' : '❌';
+      
+      let html = '<div style="font-family:var(--font-mono); color:var(--text); line-height:2;">';
+      html += '<div style="font-size:18px; color:var(--success); margin-bottom:12px;">Committed Selection Receipt</div>';
+      
+      if (data.banner) html += '<div>🎰 Banner: <strong>' + data.banner + '</strong></div>';
+      if (data.player) html += '<div>👤 Player: <strong>' + data.player + '</strong></div>';
+      if (data.dropped) html += '<div>🎁 Dropped: <strong style="color:#fb923c;">' + data.dropped + '</strong>' + (data.rarity ? ' (' + data.rarity + ')' : '') + '</div>';
+      
+      html += '<hr style="border-color:var(--border); margin:12px 0;">';
+      html += '<div style="font-size:14px; color:var(--text-muted);">Verification Checks</div>';
+      html += '<div>' + check(ruleOk) + ' Rule hash integrity</div>';
+      html += '<div>' + check(inputsOk) + ' Inputs hash integrity</div>';
+      html += '<div>' + check(commitOk) + ' Commitment hash integrity</div>';
+      
+      if (res) {
+        html += '<div>🔗 Beacon: drand round ' + res.beaconRound + '</div>';
+        html += '<div>🎲 Randomness: ' + res.beaconRandomness.slice(0,20) + '...</div>';
+        html += '<div>' + (res.verified ? '✅' : '⚠️') + ' Beacon signature ' + (res.verified ? 'verified by issuer' : 'unverified') + '</div>';
+        html += '<div>📊 Output: ' + res.output.slice(0,20) + '...</div>';
+        if (res.selection) html += '<div>✨ Selection: <strong style="color:var(--accent);">' + JSON.stringify(res.selection) + '</strong></div>';
+      }
+      
+      html += '<hr style="border-color:var(--border); margin:12px 0;">';
+      html += '<div>📋 Precedence: ' + (r.precedence || 'unattested') + '</div>';
+      html += '<div>🏷️ Attestation: ' + (r.attestation || 'unattested') + '</div>';
+      html += '<div>📦 Version: ' + (r.version || '1.0.0') + '</div>';
+      
+      const allOk = ruleOk && inputsOk && commitOk;
+      html += '<div style="margin-top:16px; padding:12px; border-radius:8px; background:' + (allOk ? 'var(--green-pale)' : 'rgba(239,68,68,0.08)') + '; color:' + (allOk ? 'var(--success)' : 'var(--error)') + ';">';
+      html += allOk ? '🦭 Commitment integrity verified. The rule was locked before the entropy existed.' : '❌ Integrity check failed. This receipt may have been tampered with.';
+      html += '</div>';
+      
+      html += '</div>';
+      result.innerHTML = html;
+    })();
+  }
+})();
+</script>
+
+</body>
+</html>

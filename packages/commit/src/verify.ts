@@ -5,7 +5,7 @@
  * Every check is independently reproducible.
  */
 
-import type { CSReceipt, VerificationResult, VerificationStatus } from './types.js';
+import type { AnchorProof, CSReceipt, VerificationResult, VerificationStatus } from './types.js';
 import { getBeaconSource } from './beacon.js';
 import { computeCommitHash, deriveOutput, hashInputs, hashRule } from './crypto.js';
 
@@ -30,7 +30,13 @@ import { computeCommitHash, deriveOutput, hashInputs, hashRule } from './crypto.
  * }
  * ```
  */
-export async function verifyReceipt(receipt: CSReceipt): Promise<VerificationResult> {
+export async function verifyReceipt(
+  receipt: CSReceipt,
+  options?: {
+    /** Optional callback for on-chain anchor verification */
+    verifyAnchor?: (anchor: AnchorProof, commitHash: string) => Promise<boolean>;
+  }
+): Promise<VerificationResult> {
   const checks = {
     commitmentIntegrity: false,
     precedenceVerified: false,
@@ -72,23 +78,31 @@ export async function verifyReceipt(receipt: CSReceipt): Promise<VerificationRes
 
   // ─── Check 2: Precedence ──────────────────────────────────
   if (anchor && receipt.precedence === 'onchain') {
-    try {
-      const beacon = getBeaconSource(commitment.beacon);
-      const roundTime = beacon.getRoundTime(commitment.targetRound);
-
-      if (anchor.blockTimestamp < roundTime) {
-        checks.precedenceVerified = true;
-      } else {
-        reasons.push(
-          `Anchor timestamp (${anchor.blockTimestamp}) does not precede ` +
-          `target round time (${roundTime})`
-        );
+    if (options?.verifyAnchor) {
+      try {
+        const anchorValid = await options.verifyAnchor(anchor, commitment.commitHash);
+        if (anchorValid) {
+          const beacon = getBeaconSource(commitment.beacon);
+          const roundTime = beacon.getRoundTime(commitment.targetRound);
+          if (anchor.blockTimestamp < roundTime) {
+            checks.precedenceVerified = true;
+          } else {
+            reasons.push('Anchor timestamp does not precede target round time');
+          }
+        } else {
+          reasons.push('Anchor proof rejected by verifyAnchor callback');
+        }
+      } catch (err) {
+        reasons.push(`Anchor verification failed: ${err}`);
       }
-    } catch (err) {
-      reasons.push(`Precedence check failed: ${err}`);
+    } else {
+      // No verifyAnchor callback — cannot trust self-reported anchor data
+      reasons.push(
+        'Anchor proof present but cannot be independently verified without an RPC provider. ' +
+        'Pass verifyAnchor callback for on-chain verification.'
+      );
     }
   } else if (receipt.precedence === 'unattested') {
-    // Unattested is valid but partial — precedence cannot be verified
     reasons.push('Precedence is unattested — commitment timing cannot be independently verified');
   }
 
@@ -143,12 +157,10 @@ export async function verifyReceipt(receipt: CSReceipt): Promise<VerificationRes
           reasons.push('Selection does not match rule application to output');
         }
       } else {
-        // Custom rule — selection verification delegated to operator's algorithm
-        // Mark as verified if selection is present (operator filled it in)
-        checks.selectionVerified = resolution.selection !== null;
-        if (!checks.selectionVerified) {
-          reasons.push('Custom rule — selection verification requires operator algorithm');
-        }
+        // Custom rule — selection verification requires operator algorithm
+        // DO NOT auto-pass — this is a security-critical check
+        checks.selectionVerified = false;
+        reasons.push('Custom rule — selection verification requires operator-provided verification function');
       }
     } catch (err) {
       reasons.push(`Selection verification failed: ${err}`);

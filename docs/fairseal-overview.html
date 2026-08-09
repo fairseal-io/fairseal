@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairSeal — Project Overview / 專案概覽</title>
+<style>
+  @page { size: A4; margin: 12mm 12mm 10mm 12mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans TC', 'Microsoft JhengHei', system-ui, sans-serif;
+    font-size: 8.2px; line-height: 1.4; color: #1a1a2e;
+    max-width: 210mm; margin: 0 auto; padding: 12mm 12mm 10mm 12mm;
+  }
+
+  /* Header */
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; border-bottom: 2.5px solid #0f3460; padding-bottom: 7px; }
+  .logo { font-size: 22px; font-weight: 800; color: #0f3460; letter-spacing: -0.5px; }
+  .logo span { color: #16c79a; }
+  .tagline { font-size: 8.5px; color: #444; margin-top: 1px; line-height: 1.35; }
+  .tagline-zh { font-size: 8px; color: #777; }
+  .header-right { text-align: right; font-size: 7.5px; color: #777; line-height: 1.5; }
+  .header-right a { color: #0f3460; text-decoration: none; }
+
+  /* Grid */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .full { grid-column: 1 / -1; }
+
+  /* Sections */
+  .section { margin-bottom: 6px; }
+  .section-title {
+    font-size: 9px; font-weight: 700; color: #0f3460;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    margin-bottom: 3px; border-bottom: 1px solid #d8dce6; padding-bottom: 2px;
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  .section-title .zh { text-transform: none; font-size: 8px; color: #666; font-weight: 500; letter-spacing: 0; }
+  .section-title .badge { background: #16c79a; color: white; font-size: 6.5px; padding: 1px 4px; border-radius: 3px; text-transform: none; letter-spacing: 0; font-weight: 600; }
+
+  p { margin-bottom: 3px; }
+  .zh-note { color: #666; font-size: 7.5px; }
+  strong { color: #0f3460; }
+
+  /* Lists */
+  ul { padding-left: 12px; margin-bottom: 3px; }
+  li { margin-bottom: 1.5px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 3px 0; font-size: 7.8px; }
+  th { background: #0f3460; color: white; padding: 2.5px 5px; text-align: left; font-weight: 600; font-size: 7px; text-transform: uppercase; letter-spacing: 0.4px; }
+  td { padding: 2.5px 5px; border-bottom: 1px solid #eee; }
+  tr:nth-child(even) td { background: #f8f9fa; }
+
+  /* Flow diagram */
+  .flow {
+    background: #f4f6f9; border: 1px solid #dde; border-radius: 4px;
+    padding: 6px 8px; font-family: 'SF Mono', 'Fira Code', 'Noto Sans Mono', monospace;
+    font-size: 7px; line-height: 1.55; white-space: pre; margin: 3px 0; color: #333;
+  }
+  .flow .step { color: #0f3460; font-weight: 700; }
+  .flow .accent { color: #16c79a; font-weight: 600; }
+  .flow .zh { color: #888; font-size: 6.5px; }
+
+  /* Stats bar */
+  .stats-bar {
+    background: linear-gradient(135deg, #0f3460 0%, #1a1a2e 100%);
+    color: white; padding: 6px 10px; border-radius: 4px; margin: 6px 0;
+    display: flex; justify-content: space-around; align-items: center;
+  }
+  .stat { text-align: center; }
+  .stat-num { font-size: 13px; font-weight: 800; color: #16c79a; display: block; line-height: 1.2; }
+  .stat-label { font-size: 6.5px; text-transform: uppercase; letter-spacing: 0.4px; opacity: 0.85; }
+
+  /* Track labels */
+  .track { font-weight: 700; color: #0f3460; font-size: 8px; margin-top: 3px; margin-bottom: 1px; }
+  .track .zh { color: #888; font-weight: 400; font-size: 7.5px; }
+
+  /* Footer */
+  .footer {
+    margin-top: 6px; padding-top: 5px; border-top: 1.5px solid #0f3460;
+    display: flex; justify-content: space-between; font-size: 7px; color: #999;
+  }
+  .footer a { color: #0f3460; text-decoration: none; }
+
+  .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 7.5px; background: #f0f1f3; padding: 0.5px 2px; border-radius: 2px; }
+
+  /* Compact mode for rows 3+ */
+  .compact-table td, .compact-table th { padding: 2px 4px; font-size: 7.5px; }
+  .compact-table th { font-size: 6.5px; }
+
+  @media print {
+    body { padding: 0; }
+    .stats-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<div class="header">
+  <div>
+    <div class="logo">🦭 Fair<span>Seal</span></div>
+    <div class="tagline">Provably Fair Infrastructure — Verifiable Randomness for Games, AI &amp; Commerce</div>
+    <div class="tagline-zh">可驗證公平基礎設施 — 遊戲、AI 與商務的可驗證隨機性</div>
+  </div>
+  <div class="header-right">
+    <a href="https://fairseal.io">fairseal.io</a> · <a href="https://github.com/ned-del/fairseal">GitHub</a><br>
+    August 2026
+  </div>
+</div>
+
+<!-- ═══════════════ ROW 1: What + How ═══════════════ -->
+<div class="grid">
+  <div class="section">
+    <div class="section-title">What is FairSeal <span class="zh">什麼是 FairSeal</span></div>
+    <p><strong>Verifiable randomness infrastructure.</strong> Cryptographic proof that any randomized selection — slot spin, loot drop, gacha pull, AI agent decision — was committed before the outcome was knowable and was not tampered with.</p>
+    <p class="zh-note">可驗證隨機性基礎設施。密碼學證明：任何隨機選擇在結果可知前已承諾，且未被竄改。</p>
+    <p>Core primitive: <strong>Committed Selection Receipts (CSR)</strong> — compact proof locking selection rules to a future randomness source, verified client-side.</p>
+    <p class="zh-note">核心原語：<strong>承諾式選擇收據（CSR）</strong> — 將選擇規則鎖定至未來隨機源的簡潔證明。</p>
+    <p style="margin-top: 3px;"><strong>Three conditions define our market / 三大適用條件：</strong></p>
+    <ul>
+      <li>Randomness is involved / 有隨機性</li>
+      <li>Stakes are attached (money, items, trust) / 有利害關係</li>
+      <li>Someone may dispute fairness / 有人可能質疑公平性</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-title">How It Works <span class="zh">運作機制</span></div>
+    <div class="flow"><span class="step">1. COMMIT</span>     Operator locks seed → SHA-256 hash published
+             <span class="zh">營運商鎖定種子 → 發布 SHA-256 雜湊</span>
+
+<span class="step">2. RANDOMNESS</span>  drand beacon arrives (BLS12-381 signed)
+             <span class="zh">drand 信標到達（BLS12-381 簽名）</span>
+
+<span class="step">3. DERIVE</span>     HMAC-SHA256(seed, beacon ‖ inputs) → result
+             <span class="zh">推導：任何人皆可重新計算</span>
+
+<span class="step">4. RECEIPT</span>    Compact proof, Merkle-anchored on Base L2
+             <span class="zh">簡潔證明，Merkle 錨定於 Base L2</span>
+
+<span class="step">5. VERIFY</span>     Client-side · No trust · <span class="accent">verify.fairseal.io</span>
+             <span class="zh">客戶端驗證，無需信任</span></div>
+  </div>
+</div>
+
+<!-- ═══════════════ STATS BAR ═══════════════ -->
+<div class="stats-bar">
+  <div class="stat"><span class="stat-num">5</span><span class="stat-label">npm packages</span></div>
+  <div class="stat"><span class="stat-num">5</span><span class="stat-label">live domains</span></div>
+  <div class="stat"><span class="stat-num">5</span><span class="stat-label">patents (PCT)</span></div>
+  <div class="stat"><span class="stat-num">435K+</span><span class="stat-label">VDF epochs</span></div>
+  <div class="stat"><span class="stat-num">x402</span><span class="stat-label">revenue live</span></div>
+  <div class="stat"><span class="stat-num">GLI-19</span><span class="stat-label">research done</span></div>
+</div>
+
+<!-- ═══════════════ ROW 2: Business + Patents ═══════════════ -->
+<div class="grid">
+  <div class="section">
+    <div class="section-title">Business Applications <span class="zh">商業應用</span></div>
+
+    <div class="track">Track 1 — Gaming <span class="zh">遊戲（老虎機、轉蛋、戰利品箱）</span></div>
+    <ul>
+      <li>Game API SDK (<span class="mono">@fairseal/game</span>) — Mode A (full provably fair) &amp; Mode B (GLI-19 safe)</li>
+      <li>Gacha/loot: verifies disclosed rates match implementation</li>
+      <li>Live demo: Sic Bo at <span class="mono">play.fairseal.io</span></li>
+    </ul>
+
+    <div class="track">Track 2 — AI Agent Commerce <span class="zh">AI 智慧體商務</span></div>
+    <ul>
+      <li>Agents making randomized decisions need verifiable receipts</li>
+      <li>x402 micropayments — USDC on Base, no registration</li>
+      <li>Cloudflare Wallets: <span class="mono">fairseal.cloudflare.pay</span></li>
+    </ul>
+
+    <div class="track">Track 3 — Compliance &amp; Audit <span class="zh">合規與審計</span></div>
+    <ul>
+      <li>Lottery/sweepstakes regulatory compliance — immutable audit trail</li>
+      <li>NFT drops — provably fair allocation</li>
+      <li>Enterprise RNG audit — Mode B for auditor-verifiable chain</li>
+    </ul>
+  </div>
+
+  <div>
+    <div class="section">
+      <div class="section-title">Patent Portfolio <span class="zh">專利組合</span> <span class="badge">PCT Filed</span></div>
+      <table class="compact-table">
+        <tr><th>#</th><th>Title</th><th>Status</th></tr>
+        <tr><td>1</td><td>Game RNG via Blockchain + Merkle Trees</td><td style="color:#16c79a;font-weight:600;">ISR Favorable (all 6 refs Cat. A)</td></tr>
+        <tr><td>2</td><td>VDF-Protected Batch RNG</td><td>Filed Jul 2, 2026</td></tr>
+        <tr><td>3</td><td>VEO Trust Artifacts</td><td>Filed Jul 2, 2026</td></tr>
+        <tr><td>4</td><td>Trust Coordination — Multi-Agent Chains</td><td>Filed Jul 2, 2026</td></tr>
+        <tr><td>5</td><td>Trust Runtime — "Trust Health" Scoring</td><td>Filed Jul 2, 2026 · <strong>Strongest</strong></td></tr>
+      </table>
+      <p style="margin-top: 2px; font-size: 7px; color: #666;">PCT/CN2026/086184 · Applicant: HSU Nan-Hsuan<br>
+      Strategy: commit-to-beacon stays <strong>open</strong> (adoption) · Merkle anchoring stays <strong>protected</strong><br>
+      讓免費的部分真正免費，專利保護賺錢的部分。</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Revenue Model <span class="zh">營收模式</span></div>
+      <table class="compact-table">
+        <tr><th>Tier</th><th>What</th><th>Price</th></tr>
+        <tr><td>Free</td><td><span class="mono">@fairseal/commit</span> SDK</td><td>$0</td></tr>
+        <tr><td>API</td><td>VDF epochs, game endpoints, RNG</td><td>$0.001/call (USDC x402)</td></tr>
+        <tr><td>Anchoring</td><td>Merkle batch → Base L2</td><td>$0.01/batch</td></tr>
+        <tr><td>Verify</td><td>verify.fairseal.io verifier</td><td>Free (adoption)</td></tr>
+      </table>
+      <p style="margin-top: 2px; font-size: 7px; color: #666;">x402 protocol · USDC on Base L2 · Cloudflare Monetization Gateway planned<br>
+      Free SDK → format adoption → API + anchoring = revenue → network effects</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ROW 3: Infrastructure + GLI + Roadmap ═══════════════ -->
+<div class="grid">
+  <div class="section">
+    <div class="section-title">Live Infrastructure <span class="zh">線上基礎設施</span></div>
+    <table class="compact-table">
+      <tr><th>Domain / 域名</th><th>Purpose / 用途</th><th>Status</th></tr>
+      <tr><td><span class="mono">fairseal.io</span></td><td>Landing page / 首頁</td><td>✅</td></tr>
+      <tr><td><span class="mono">api.fairseal.io</span></td><td>VDF engine + Game API</td><td>✅</td></tr>
+      <tr><td><span class="mono">verify.fairseal.io</span></td><td>Receipt verification / 收據驗證</td><td>✅</td></tr>
+      <tr><td><span class="mono">play.fairseal.io</span></td><td>Sic Bo demo / 骰寶示範</td><td>✅</td></tr>
+      <tr><td><span class="mono">x402.fairseal.io</span></td><td>x402 payments (USDC)</td><td>✅</td></tr>
+    </table>
+
+    <table class="compact-table" style="margin-top: 4px;">
+      <tr><th>Package / 套件</th><th>Version</th><th>Purpose / 用途</th></tr>
+      <tr><td><span class="mono">@fairseal/core</span></td><td>1.3.2</td><td>VEO-2 types, primitives</td></tr>
+      <tr><td><span class="mono">@fairseal/commit</span></td><td>0.1.2</td><td>CSR engine</td></tr>
+      <tr><td><span class="mono">@fairseal/auto</span></td><td>0.1.1</td><td>AI SDK auto-instrumentation</td></tr>
+      <tr><td><span class="mono">@fairseal/verify</span></td><td>0.1.0</td><td>Independent verification</td></tr>
+      <tr><td><span class="mono">@fairseal/game</span></td><td>RFC</td><td>Game API for RGS</td></tr>
+    </table>
+  </div>
+
+  <div>
+    <div class="section">
+      <div class="section-title">GLI-19 Compliance <span class="zh">GLI-19 合規</span></div>
+      <p><strong>Key finding:</strong> "Player shall not influence RNG" (§3.4.4) applies only to <strong>mechanical devices</strong>, not software RNG. Software requirements (§3.2–3.3) focus on distribution, independence, and cryptographic strength — all satisfied by HMAC-SHA256.</p>
+      <p class="zh-note">關鍵發現：「玩家不得影響 RNG」僅適用於機械裝置，不適用軟體 RNG。</p>
+      <ul>
+        <li><strong>Mode A</strong> (Provably Fair): Player seed in derivation — full verifiability</li>
+        <li><strong>Mode B</strong> (GLI-Safe): Player seed as witness only — for regulated markets</li>
+      </ul>
+      <p class="zh-note">模式 A：完全可驗證公平；模式 B：符合 MGA/UKGC 監管要求</p>
+      <p><strong>Next:</strong> Pre-consultation with GLI or iTech Labs for Mode B certification.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Roadmap <span class="zh">路線圖</span></div>
+      <table class="compact-table">
+        <tr><th>Phase / 階段</th><th>Target / 目標</th><th></th></tr>
+        <tr><td>Core SDK</td><td>CSR library + verification</td><td>✅</td></tr>
+        <tr><td>VDF Engine</td><td>Wesolowski proofs</td><td>✅</td></tr>
+        <tr><td>x402 Revenue</td><td>Agent micropayments / 微支付</td><td>✅</td></tr>
+        <tr><td>Game API</td><td>@fairseal/game for RGS</td><td>🔄</td></tr>
+        <tr><td>Studio Pilots</td><td>First RGS integration / 首家整合</td><td>📋</td></tr>
+        <tr><td>GLI Pilot</td><td>Mode B pre-consultation</td><td>📋</td></tr>
+        <tr><td>Cloudflare</td><td>Monetization Gateway</td><td>📋</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<div class="footer">
+  <div>🦭 FairSeal · <a href="https://fairseal.io">fairseal.io</a> · <a href="https://github.com/ned-del/fairseal">github.com/ned-del/fairseal</a> · <a href="mailto:ned@aeom.com">ned@aeom.com</a></div>
+  <div>fairseal.cloudflare.pay · MIT License · © 2026</div>
+</div>
+
+</body>
+</html>

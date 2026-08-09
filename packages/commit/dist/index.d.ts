@@ -263,6 +263,57 @@ declare class DrandBeaconSource implements BeaconSource {
     verifyBeacon(beacon: BeaconRound): Promise<boolean>;
 }
 /**
+ * Offline beacon source for demos and firewall environments.
+ *
+ * Generates deterministic (but NOT cryptographically random) beacons
+ * from the round number using SHA-256. NOT suitable for production —
+ * the output is predictable from the round number alone.
+ *
+ * Use `{ beaconId: 'offline' }` in CommitmentOptions to activate.
+ */
+declare class OfflineBeaconSource implements BeaconSource {
+    readonly config: BeaconConfig;
+    constructor();
+    getRound(unixSeconds: number): number;
+    getRoundTime(round: number): number;
+    /**
+     * Generate a deterministic beacon from the round number.
+     * randomness = SHA-256("offline-beacon:" + round)
+     * signature  = SHA-256("offline-sig:" + round)
+     *
+     * ⚠️ NOT cryptographically secure — suitable for demos only.
+     */
+    fetchBeacon(round: number): Promise<BeaconRound>;
+    /**
+     * Offline beacons are self-generated, so "verification" just checks
+     * the deterministic derivation is consistent.
+     */
+    verifyBeacon(beacon: BeaconRound): Promise<boolean>;
+}
+/**
+ * Caching wrapper around any BeaconSource.
+ *
+ * Caches fetched beacons in-memory. On fetch failure, returns the
+ * cached value if available. Helps with intermittent connectivity
+ * and avoids redundant relay requests.
+ */
+declare class CachedBeaconSource implements BeaconSource {
+    readonly config: BeaconConfig;
+    private readonly inner;
+    private readonly cache;
+    constructor(inner: BeaconSource);
+    getRound(unixSeconds: number): number;
+    getRoundTime(round: number): number;
+    fetchBeacon(round: number): Promise<BeaconRound>;
+    verifyBeacon(beacon: BeaconRound): Promise<boolean>;
+    /** Check if a round is in the cache. */
+    has(round: number): boolean;
+    /** Pre-populate the cache (e.g. from stored receipts). */
+    seed(beacon: BeaconRound): void;
+    /** Clear all cached entries. */
+    clear(): void;
+}
+/**
  * Default beacon source — drand quicknet with standard relays.
  */
 declare function createDefaultBeacon(): BeaconSource;
@@ -329,4 +380,4 @@ declare function fromHex(hex: string): Uint8Array;
  */
 declare function deriveOutput(beaconRandomness: string, ruleHash: string, inputsHash: string): string;
 
-export { type AnchorProof, type BeaconConfig, type BeaconRound, type BeaconSource, type CSReceipt, type Commitment, type CommitmentOptions, DRAND_QUICKNET, DrandBeaconSource, type PrecedenceType, type Resolution, type VerificationResult, type VerificationStatus, applyRule, computeCommitHash, createCommitment, createDefaultBeacon, createReceipt, deriveOutput, fromHex, getBeaconSource, hashInputs, hashRule, registerBeacon, resolveCommitment, sha256, toHex, validateRule, verifyReceipt };
+export { type AnchorProof, type BeaconConfig, type BeaconRound, type BeaconSource, type CSReceipt, CachedBeaconSource, type Commitment, type CommitmentOptions, DRAND_QUICKNET, DrandBeaconSource, OfflineBeaconSource, type PrecedenceType, type Resolution, type VerificationResult, type VerificationStatus, applyRule, computeCommitHash, createCommitment, createDefaultBeacon, createReceipt, deriveOutput, fromHex, getBeaconSource, hashInputs, hashRule, registerBeacon, resolveCommitment, sha256, toHex, validateRule, verifyReceipt };

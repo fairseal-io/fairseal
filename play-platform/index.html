@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairSeal · Developer Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg-soft:#f0f7ff;--bg-card:#f8fbff;
+  --border:#e2e8f0;--text:#0f172a;--text-dim:#475569;
+  --blue:#2563eb;--blue-light:#3b82f6;--green:#059669;
+  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','Fira Code',monospace;
+  --radius:12px;
+}
+body{font-family:var(--font-sans);color:var(--text);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Nav */
+nav{display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid var(--border);font-size:14px;font-weight:500;flex-wrap:wrap}
+nav a{color:var(--text-dim);transition:color .15s}
+nav a:hover{color:var(--blue);text-decoration:none}
+nav a.brand{font-weight:700;color:var(--text);font-size:16px}
+nav a.active{color:var(--blue);font-weight:600}
+nav .sep{color:var(--border);user-select:none}
+
+/* Hero */
+.hero{text-align:center;padding:64px 24px 48px;max-width:640px;margin:0 auto}
+.hero h1{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-0.5px;margin-bottom:12px}
+.hero p{font-size:18px;color:var(--text-dim);max-width:480px;margin:0 auto}
+
+/* Cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;max-width:960px;margin:0 auto 64px;padding:0 24px}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:32px 28px;transition:box-shadow .2s,transform .2s;display:flex;flex-direction:column}
+.card:hover{box-shadow:0 8px 24px rgba(37,99,235,.08);transform:translateY(-2px)}
+.card-icon{font-size:40px;margin-bottom:16px}
+.card h2{font-size:20px;font-weight:700;margin-bottom:4px}
+.card .subtitle{color:var(--text-dim);font-size:14px;margin-bottom:16px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:24px}
+.tag{background:var(--bg-soft);color:var(--blue);font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap;font-family:var(--font-mono)}
+.card .play-btn{margin-top:auto;display:inline-flex;align-items:center;gap:6px;background:var(--blue);color:#fff;padding:10px 20px;border-radius:8px;font-weight:600;font-size:14px;transition:background .15s;align-self:flex-start}
+.card .play-btn:hover{background:var(--blue-light);text-decoration:none}
+
+/* How It Works */
+.how{max-width:720px;margin:0 auto 64px;padding:0 24px}
+.how h3{font-size:22px;font-weight:700;margin-bottom:20px;text-align:center}
+.steps{display:grid;gap:16px}
+.step{display:flex;gap:16px;align-items:flex-start;padding:20px 24px;background:var(--bg-soft);border-radius:var(--radius)}
+.step-num{flex-shrink:0;width:32px;height:32px;background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.step-text{font-size:15px;color:var(--text)}
+.step-text strong{font-weight:600}
+.integration{margin-top:32px;text-align:center;padding:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius)}
+.integration code{font-family:var(--font-mono);background:var(--bg-soft);padding:6px 14px;border-radius:6px;font-size:14px;color:var(--blue);font-weight:500}
+.integration p{color:var(--text-dim);font-size:13px;margin-top:8px}
+
+/* Footer */
+footer{text-align:center;padding:32px 24px;border-top:1px solid var(--border);color:var(--text-dim);font-size:13px}
+footer a{color:var(--text-dim);font-weight:500}
+footer a:hover{color:var(--blue)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="https://fairseal.io" class="brand">🦭 FairSeal</a>
+  <span class="sep">·</span>
+  <a href="/" class="active">Play</a>
+  <a href="https://verify.fairseal.io">Verify</a>
+  <a href="https://github.com/ned-del/fairseal">GitHub</a>
+</nav>
+
+<section class="hero">
+  <h1>Developer Playground</h1>
+  <p>Every result is verifiable. Pick a demo.</p>
+</section>
+
+<section class="cards">
+  <div class="card">
+    <div class="card-icon">🎲</div>
+    <h2>Sic Bo</h2>
+    <p class="subtitle">3-dice Asian casino classic</p>
+    <div class="tags">
+      <span class="tag">VDF Entropy</span>
+      <span class="tag">HMAC Derivation</span>
+      <span class="tag">On-chain Anchor</span>
+    </div>
+    <a href="/sicbo" class="play-btn">Play →</a>
+  </div>
+
+  <div class="card">
+    <div class="card-icon">🎰</div>
+    <h2>Slots</h2>
+    <p class="subtitle">5-reel slot machine</p>
+    <div class="tags">
+      <span class="tag">Weighted Symbols</span>
+      <span class="tag">Multi-row Wins</span>
+      <span class="tag">Deterministic Grid</span>
+    </div>
+    <a href="/slots" class="play-btn">Play →</a>
+  </div>
+
+  <div class="card">
+    <div class="card-icon">🎁</div>
+    <h2>Gacha</h2>
+    <p class="subtitle">Loot box / treasure pull</p>
+    <div class="tags">
+      <span class="tag">Weighted Drop Rates</span>
+      <span class="tag">Rarity Tiers</span>
+      <span class="tag">Drop Rate Verification</span>
+    </div>
+    <a href="/gacha" class="play-btn">Play →</a>
+  </div>
+</section>
+
+<section class="how">
+  <h3>How It Works</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text">Each game calls <strong>api.fairseal.io</strong> to get a VDF-backed random result</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text">The result includes a <strong>game_id</strong> and full cryptographic proof</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text">Click <strong>"Verify"</strong> to see the complete proof chain on verify.fairseal.io</div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-text">Every step is independently reproducible — <strong>no trust required</strong></div>
+    </div>
+  </div>
+  <div class="integration">
+    <code>npm install @fairseal/commit</code>
+    <p>Integrate provably fair randomness into your own games</p>
+  </div>
+</section>
+
+<footer>
+  🦭 FairSeal · Provably fair infrastructure ·
+  <a href="https://fairseal.io">fairseal.io</a> ·
+  <a href="https://verify.fairseal.io">verify.fairseal.io</a>
+</footer>
+
+</body>
+</html>

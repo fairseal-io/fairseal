@@ -1,7 +1,7 @@
 {
   "name": "@fairseal/client",
   "version": "0.1.0",
-  "description": "One-line provably fair selection using OpenRNG commit/reveal",
+  "description": "One-line provably fair selection using FairSeal commit/reveal",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",

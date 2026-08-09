@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairSeal · Slots Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg-soft:#f0f7ff;--bg-card:#f8fbff;
+  --border:#e2e8f0;--text:#0f172a;--text-dim:#475569;
+  --blue:#2563eb;--blue-light:#3b82f6;--green:#059669;
+  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','Fira Code',monospace;
+  --radius:12px;
+}
+body{font-family:var(--font-sans);color:var(--text);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+
+nav{display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid var(--border);font-size:14px;font-weight:500;flex-wrap:wrap}
+nav a{color:var(--text-dim);transition:color .15s}
+nav a:hover{color:var(--blue);text-decoration:none}
+nav a.brand{font-weight:700;color:var(--text);font-size:16px}
+nav a.active{color:var(--blue);font-weight:600}
+nav .sep{color:var(--border);user-select:none}
+
+.container{max-width:680px;margin:0 auto;padding:32px 24px 64px}
+h1{font-size:28px;font-weight:700;text-align:center;margin-bottom:4px}
+.page-sub{text-align:center;color:var(--text-dim);font-size:15px;margin-bottom:24px}
+
+/* Balance Bar */
+.balance-bar{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:var(--bg-soft);border-radius:var(--radius);margin-bottom:24px;flex-wrap:wrap;gap:8px}
+.balance{font-weight:700;font-size:18px}
+.balance span{color:var(--blue);font-family:var(--font-mono)}
+.bet-controls{display:flex;align-items:center;gap:8px}
+.bet-controls label{font-size:13px;font-weight:600;color:var(--text-dim)}
+.bet-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font-sans);color:var(--text);transition:all .15s}
+.bet-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.bet-btn:hover:not(.active){border-color:var(--blue-light)}
+
+/* Slot Machine */
+.machine{background:var(--bg-card);border:2px solid var(--border);border-radius:16px;padding:24px 16px;margin-bottom:24px;position:relative;overflow:hidden}
+
+/* Grid */
+.grid{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(3,1fr);gap:4px;margin-bottom:20px}
+.cell{display:flex;align-items:center;justify-content:center;height:72px;font-size:36px;background:#fff;border-radius:8px;border:1px solid var(--border);position:relative;overflow:hidden;transition:border-color .3s,background .3s}
+.cell.spinning .reel-strip{animation:reelSpin .15s linear infinite}
+.cell.win{border-color:var(--green);background:#ecfdf5;animation:winFlash 1s ease-in-out 3}
+
+@keyframes reelSpin{
+  0%{transform:translateY(0)}
+  100%{transform:translateY(-100%)}
+}
+@keyframes winFlash{
+  0%,100%{background:#ecfdf5}
+  50%{background:#d1fae5}
+}
+
+.reel-strip{display:flex;flex-direction:column;align-items:center;justify-content:center}
+.reel-strip span{font-size:36px;line-height:72px}
+
+/* Row labels */
+.row-labels{position:absolute;right:4px;top:24px;display:flex;flex-direction:column;gap:4px}
+.row-label{height:72px;display:flex;align-items:center;font-size:11px;font-weight:600;color:var(--text-dim);padding-right:4px}
+
+/* Win Banner */
+.win-banner{text-align:center;min-height:48px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:16px;font-weight:700}
+.win-banner.has-win{color:var(--green)}
+.win-banner.no-win{color:var(--text-dim);font-weight:500;font-size:14px}
+.win-amount{font-family:var(--font-mono);font-size:20px}
+
+/* Spin Button */
+.spin-area{text-align:center;margin-bottom:24px}
+#spinBtn{padding:14px 48px;font-size:18px;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:var(--font-sans);transition:all .2s;min-width:180px}
+#spinBtn:hover:not(:disabled){background:var(--blue-light);transform:translateY(-1px);box-shadow:0 6px 24px rgba(37,99,235,.25)}
+#spinBtn:active:not(:disabled){transform:translateY(0)}
+#spinBtn:disabled{opacity:.5;cursor:not-allowed}
+
+.verify-link{display:block;text-align:center;font-size:13px;font-weight:600;margin-top:8px}
+
+/* Error */
+.error-msg{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:12px 16px;border-radius:8px;font-size:14px;text-align:center;margin-bottom:16px;display:none}
+.error-msg.visible{display:block}
+
+/* Proof Panel */
+.proof-panel{background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:32px;display:none}
+.proof-panel.visible{display:block}
+.proof-panel h4{font-size:13px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.proof-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px}
+.proof-label{color:var(--text-dim);font-weight:500}
+.proof-value{font-family:var(--font-mono);font-size:12px;color:var(--text)}
+
+/* History */
+.history{margin-top:32px}
+.history h3{font-size:16px;font-weight:700;margin-bottom:12px}
+.history-list{list-style:none}
+.history-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:14px}
+.history-item:last-child{border-bottom:none}
+.history-grid{display:flex;gap:2px;font-size:14px;flex-shrink:0}
+.history-result{flex:1;font-weight:600}
+.history-result.win{color:var(--green)}
+.history-result.loss{color:var(--text-dim)}
+.history-verify{font-size:12px;color:var(--blue);flex-shrink:0}
+.no-history{color:var(--text-dim);font-size:14px;text-align:center;padding:24px}
+
+footer{text-align:center;padding:32px 24px;border-top:1px solid var(--border);color:var(--text-dim);font-size:13px}
+footer a{color:var(--text-dim);font-weight:500}
+footer a:hover{color:var(--blue)}
+
+@media(max-width:480px){
+  .cell{height:56px;font-size:28px}
+  .reel-strip span{font-size:28px;line-height:56px}
+  .grid{gap:3px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="https://fairseal.io" class="brand">🦭 FairSeal</a>
+  <span class="sep">·</span>
+  <a href="/" class="active">Play</a>
+  <a href="https://verify.fairseal.io">Verify</a>
+  <a href="https://github.com/ned-del/fairseal">GitHub</a>
+</nav>
+
+<div class="container">
+  <h1>🎰 Slots Demo</h1>
+  <p class="page-sub">5-reel slot machine with verifiable outcomes</p>
+
+  <div class="balance-bar">
+    <div class="balance">Balance: <span id="balanceDisplay">1,000</span> FUN</div>
+    <div class="bet-controls">
+      <label>Bet:</label>
+      <button class="bet-btn active" data-bet="1" onclick="setBet(1)">1</button>
+      <button class="bet-btn" data-bet="5" onclick="setBet(5)">5</button>
+      <button class="bet-btn" data-bet="10" onclick="setBet(10)">10</button>
+    </div>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="machine">
+    <div class="grid" id="grid"></div>
+    <div class="win-banner no-win" id="winBanner">Spin to play</div>
+  </div>
+
+  <div class="spin-area">
+    <button id="spinBtn" onclick="spin()">SPIN</button>
+    <a class="verify-link" id="verifyLink" target="_blank" style="display:none">🔍 Verify this spin →</a>
+  </div>
+
+  <div class="proof-panel" id="proofPanel">
+    <h4>Cryptographic Proof</h4>
+    <div class="proof-row"><span class="proof-label">VDF Epoch</span><span class="proof-value" id="proofEpoch">—</span></div>
+    <div class="proof-row"><span class="proof-label">Client Seed</span><span class="proof-value" id="proofSeed">—</span></div>
+    <div class="proof-row"><span class="proof-label">RNG Value</span><span class="proof-value" id="proofRng">—</span></div>
+    <div class="proof-row"><span class="proof-label">Verify</span><span class="proof-value"><a id="proofVerify" target="_blank" style="font-size:12px">🔍 Open →</a></span></div>
+  </div>
+
+  <div class="history">
+    <h3>Spin History</h3>
+    <ul class="history-list" id="historyList">
+      <li class="no-history" id="noHistory">No spins yet</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  🦭 FairSeal · Provably fair infrastructure ·
+  <a href="https://fairseal.io">fairseal.io</a> ·
+  <a href="https://verify.fairseal.io">verify.fairseal.io</a>
+</footer>
+
+<script>
+const API = 'https://api.fairseal.io';
+const SYMBOLS = ['🍒','🍋','🔔','⭐','💎','7️⃣','🃏'];
+let balance = 1000;
+let currentBet = 1;
+let spinning = false;
+const spinHistory = [];
+
+// Initialize grid
+const grid = document.getElementById('grid');
+for (let row = 0; row < 3; row++) {
+  for (let col = 0; col < 5; col++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.id = 'cell-' + row + '-' + col;
+    cell.innerHTML = '<div class="reel-strip"><span>' + SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)] + '</span></div>';
+    grid.appendChild(cell);
+  }
+}
+
+async function sha256(input) {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function openVerify(gameId) {
+  window.open('https://verify.fairseal.io/' + gameId, '_blank');
+}
+
+function setBet(amount) {
+  currentBet = amount;
+  document.querySelectorAll('.bet-btn').forEach(b => {
+    b.classList.toggle('active', Number(b.dataset.bet) === amount);
+  });
+}
+
+function updateBalance() {
+  document.getElementById('balanceDisplay').textContent = balance.toLocaleString();
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 5000);
+}
+
+function setCell(row, col, symbol) {
+  const cell = document.getElementById('cell-' + row + '-' + col);
+  cell.querySelector('.reel-strip span').textContent = symbol;
+}
+
+function startSpinAnimation() {
+  for (let col = 0; col < 5; col++) {
+    for (let row = 0; row < 3; row++) {
+      const cell = document.getElementById('cell-' + row + '-' + col);
+      cell.classList.remove('win');
+      cell.classList.add('spinning');
+      // Rapidly cycle symbols
+      const interval = setInterval(() => {
+        cell.querySelector('.reel-strip span').textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+      }, 80);
+      cell.dataset.interval = interval;
+    }
+  }
+}
+
+function stopReel(col, symbols, delay) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      for (let row = 0; row < 3; row++) {
+        const cell = document.getElementById('cell-' + row + '-' + col);
+        clearInterval(Number(cell.dataset.interval));
+        cell.classList.remove('spinning');
+        cell.querySelector('.reel-strip span').textContent = symbols[row];
+      }
+      resolve();
+    }, delay);
+  });
+}
+
+async function spin() {
+  if (spinning) return;
+  if (balance < currentBet) {
+    showError('Insufficient balance');
+    return;
+  }
+
+  spinning = true;
+  const btn = document.getElementById('spinBtn');
+  btn.disabled = true;
+  btn.textContent = 'SPINNING…';
+
+  // Deduct bet
+  balance -= currentBet;
+  updateBalance();
+
+  // Clear previous
+  document.getElementById('verifyLink').style.display = 'none';
+  document.getElementById('proofPanel').classList.remove('visible');
+  const banner = document.getElementById('winBanner');
+  banner.className = 'win-banner no-win';
+  banner.textContent = '';
+
+  // Start spin animation
+  startSpinAnimation();
+
+  try {
+    const res = await fetch(API + '/api/v1/games/slots/spin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: currentBet })
+    });
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+
+    const outcome = data.result.outcome;
+    const gridIcons = outcome.gridIcons; // [row0[5], row1[5], row2[5]]
+    const wins = outcome.wins || [];
+    const totalWin = outcome.totalWin || 0;
+    const proof = data.result.proof;
+    const verifyUrl = data.result.verifyUrl;
+
+    // Stop reels left to right with delay
+    for (let col = 0; col < 5; col++) {
+      const colSymbols = [gridIcons[0][col], gridIcons[1][col], gridIcons[2][col]];
+      await stopReel(col, colSymbols, 300);
+    }
+
+    // Highlight wins
+    if (wins.length > 0) {
+      wins.forEach(w => {
+        for (let col = 0; col < w.count; col++) {
+          const cell = document.getElementById('cell-' + w.row + '-' + col);
+          cell.classList.add('win');
+        }
+      });
+      balance += totalWin;
+      updateBalance();
+      banner.className = 'win-banner has-win';
+      banner.innerHTML = '🎉 WIN! <span class="win-amount">+' + totalWin + ' FUN</span>';
+    } else {
+      banner.className = 'win-banner no-win';
+      banner.textContent = 'No win — try again';
+    }
+
+    // Verify link
+    const vLink = document.getElementById('verifyLink');
+    vLink.href = verifyUrl;
+    vLink.style.display = '';
+
+    // Proof panel
+    if (proof) {
+      document.getElementById('proofEpoch').textContent = proof.vdfEpoch || '—';
+      document.getElementById('proofSeed').textContent = proof.clientSeed ? String(proof.clientSeed).slice(0, 8) + '…' : '—';
+      document.getElementById('proofRng').textContent = proof.rngValue ? String(proof.rngValue).slice(0, 16) + '…' : '—';
+      document.getElementById('proofVerify').href = verifyUrl;
+      document.getElementById('proofPanel').classList.add('visible');
+    }
+
+    // History
+    const midRow = gridIcons[1].join('');
+    spinHistory.unshift({
+      grid: midRow,
+      win: totalWin > 0,
+      amount: totalWin > 0 ? '+' + totalWin : '-' + currentBet,
+      verifyUrl
+    });
+    renderHistory();
+
+  } catch (e) {
+    // Stop all reels
+    for (let col = 0; col < 5; col++) {
+      for (let row = 0; row < 3; row++) {
+        const cell = document.getElementById('cell-' + row + '-' + col);
+        clearInterval(Number(cell.dataset.interval));
+        cell.classList.remove('spinning');
+      }
+    }
+    // Refund bet on error
+    balance += currentBet;
+    updateBalance();
+    showError('API temporarily unavailable');
+    banner.className = 'win-banner no-win';
+    banner.textContent = 'Spin to play';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'SPIN';
+  spinning = false;
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  document.getElementById('noHistory').style.display = spinHistory.length ? 'none' : '';
+  list.querySelectorAll('.history-item').forEach(el => el.remove());
+  spinHistory.slice(0, 15).forEach(h => {
+    const li = document.createElement('li');
+    li.className = 'history-item';
+    li.innerHTML = '<span class="history-grid">' + h.grid + '</span>'
+      + '<span class="history-result ' + (h.win ? 'win' : 'loss') + '">' + h.amount + ' FUN</span>'
+      + '<a class="history-verify" href="' + h.verifyUrl + '" target="_blank">Verify</a>';
+    list.insertBefore(li, list.children[1] || null);
+  });
+}
+</script>
+</body>
+</html>

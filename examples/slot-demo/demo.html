@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairSeal Game API — Provably Fair Slot Demo</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#1a1a2e;--bg2:#16213e;--bg3:#0f3460;--accent:#16c79a;--accent2:#1dd1a1;--gold:#f5c518;--red:#e74c3c;--text:#e8e8e8;--text-dim:#8899aa;--panel:#1e2a3a;--panel-border:#2a3a4a;--reel-bg:#0d1117;--win-glow:rgba(22,199,154,0.4)}
+html{font-size:16px}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;overflow-x:hidden}
+button{cursor:pointer;font-family:inherit;border:none;outline:none}
+button:disabled{opacity:.5;cursor:not-allowed}
+
+/* Layout */
+.app{max-width:1100px;margin:0 auto;padding:12px}
+.header{text-align:center;padding:16px 0 12px}
+.header h1{font-size:1.4rem;color:var(--accent);letter-spacing:1px}
+.header .sub{font-size:.8rem;color:var(--text-dim);margin-top:4px}
+.main-grid{display:flex;gap:12px;align-items:flex-start}
+.slot-col{flex:1;min-width:0}
+.proof-col{width:320px;flex-shrink:0}
+
+/* Panels */
+.panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:10px;padding:16px;margin-bottom:12px}
+.panel h2{font-size:.95rem;color:var(--accent);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.panel h2 .icon{font-size:1.1rem}
+
+/* Setup Panel */
+.setup-overlay{position:fixed;inset:0;background:rgba(10,10,20,.92);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
+.setup-card{background:var(--bg2);border:1px solid var(--accent);border-radius:14px;padding:32px;max-width:480px;width:100%;text-align:center}
+.setup-card h2{font-size:1.3rem;color:var(--accent);margin-bottom:6px}
+.setup-card .desc{color:var(--text-dim);font-size:.85rem;margin-bottom:20px}
+.setup-field{margin-bottom:16px;text-align:left}
+.setup-field label{display:block;font-size:.8rem;color:var(--text-dim);margin-bottom:4px}
+.setup-field .hash-display{background:var(--reel-bg);border:1px solid var(--panel-border);border-radius:6px;padding:10px;font-family:'SF Mono',Monaco,Consolas,monospace;font-size:.72rem;word-break:break-all;color:var(--gold);line-height:1.5}
+.setup-field input[type=text]{width:100%;background:var(--reel-bg);border:1px solid var(--panel-border);border-radius:6px;padding:10px;color:var(--text);font-size:.85rem;font-family:inherit}
+.setup-field input[type=text]::placeholder{color:var(--text-dim)}
+.btn-primary{background:var(--accent);color:#111;font-weight:700;padding:12px 32px;border-radius:8px;font-size:1rem;transition:all .2s}
+.btn-primary:hover:not(:disabled){background:var(--accent2);transform:translateY(-1px)}
+
+/* Beacon overlay */
+.beacon-overlay{position:fixed;inset:0;background:rgba(10,10,20,.92);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
+.beacon-card{background:var(--bg2);border:1px solid var(--bg3);border-radius:14px;padding:32px;max-width:480px;width:100%;text-align:center}
+.beacon-card h2{color:var(--accent);margin-bottom:16px}
+.beacon-step{margin:10px 0;font-size:.82rem;color:var(--text-dim);opacity:0;transition:opacity .4s}
+.beacon-step.show{opacity:1}
+.beacon-step .val{color:var(--gold);font-family:monospace;font-size:.72rem;word-break:break-all}
+.beacon-step .label{color:var(--accent);font-weight:600;margin-bottom:2px}
+.beacon-spinner{font-size:2rem;animation:bspin 1s linear infinite;display:inline-block;margin-bottom:12px}
+@keyframes bspin{to{transform:rotate(360deg)}}
+
+/* Slot Machine */
+.slot-machine{background:linear-gradient(145deg,#1e2a3a,#162040);border:2px solid var(--bg3);border-radius:14px;padding:20px;text-align:center}
+.reels-container{display:flex;justify-content:center;gap:6px;margin:16px 0;perspective:600px}
+.reel{width:64px;height:192px;background:var(--reel-bg);border:2px solid var(--panel-border);border-radius:8px;overflow:hidden;position:relative}
+.reel-inner{transition:transform .3s ease-out;display:flex;flex-direction:column}
+.reel-cell{width:64px;height:64px;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0}
+.reel-cell.win-cell{animation:wincell .6s ease-in-out 3}
+@keyframes wincell{0%,100%{background:transparent}50%{background:var(--win-glow);box-shadow:inset 0 0 20px var(--win-glow)}}
+
+/* Payline indicators */
+.paylines{display:flex;justify-content:center;gap:4px;margin-bottom:8px}
+.payline-dot{width:8px;height:8px;border-radius:50%;background:var(--panel-border)}
+.payline-dot.active{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+
+/* Info bar */
+.info-bar{display:flex;justify-content:space-between;align-items:center;margin:12px 0;padding:8px 12px;background:var(--reel-bg);border-radius:8px;font-size:.85rem}
+.info-item{text-align:center}
+.info-item .lbl{font-size:.7rem;color:var(--text-dim);text-transform:uppercase}
+.info-item .val{font-weight:700;color:var(--gold);font-size:1rem}
+.info-item .val.green{color:var(--accent)}
+
+/* Bet controls */
+.bet-controls{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0}
+.bet-btn{background:var(--bg3);color:var(--text);width:32px;height:32px;border-radius:6px;font-size:1rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+.bet-btn:hover:not(:disabled){background:var(--accent);color:#111}
+.bet-display{font-size:.95rem;min-width:60px;text-align:center}
+
+/* Spin button */
+.spin-btn{background:linear-gradient(135deg,#16c79a,#0ea87e);color:#111;font-size:1.2rem;font-weight:800;padding:14px 48px;border-radius:12px;margin:8px 0;letter-spacing:1px;transition:all .15s;position:relative;overflow:hidden}
+.spin-btn:hover:not(:disabled){transform:scale(1.04);box-shadow:0 4px 20px rgba(22,199,154,.4)}
+.spin-btn:active:not(:disabled){transform:scale(.97)}
+.spin-btn.spinning{background:linear-gradient(135deg,#e74c3c,#c0392b);pointer-events:none}
+.close-btn{background:var(--bg3);color:var(--text-dim);font-size:.8rem;padding:8px 16px;border-radius:6px;margin-top:6px}
+.close-btn:hover{color:var(--text);background:#2a3a5a}
+
+/* Free spins banner */
+.freespin-banner{display:none;background:linear-gradient(135deg,var(--gold),#e67e22);color:#111;font-weight:800;font-size:1.1rem;padding:10px;border-radius:8px;margin:8px 0;animation:fspulse 1s ease-in-out infinite alternate}
+.freespin-banner.show{display:block}
+@keyframes fspulse{from{transform:scale(1)}to{transform:scale(1.03)}}
+
+/* Win display */
+.win-display{font-size:1.3rem;font-weight:800;color:var(--gold);min-height:36px;display:flex;align-items:center;justify-content:center}
+.win-display.big{animation:bigwin .5s ease-in-out 3;color:#fff;text-shadow:0 0 20px var(--gold)}
+@keyframes bigwin{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+
+/* Proof Panel */
+.proof-panel{font-size:.78rem}
+.proof-entry{margin-bottom:10px;padding:8px;background:var(--reel-bg);border-radius:6px;border-left:3px solid var(--panel-border)}
+.proof-entry.current{border-left-color:var(--accent)}
+.proof-entry .pe-label{color:var(--accent);font-weight:600;font-size:.72rem;text-transform:uppercase;margin-bottom:2px}
+.proof-entry .pe-value{font-family:'SF Mono',Monaco,Consolas,monospace;font-size:.68rem;color:var(--gold);word-break:break-all;line-height:1.4}
+.proof-entry .pe-note{color:var(--text-dim);font-size:.68rem;margin-top:2px}
+.proof-scroll{max-height:420px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--bg3) transparent}
+.proof-scroll::-webkit-scrollbar{width:4px}
+.proof-scroll::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:2px}
+
+/* Spin log */
+.spin-log{max-height:200px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--bg3) transparent}
+.spin-log::-webkit-scrollbar{width:4px}
+.spin-log::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:2px}
+.spin-log-entry{display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:.72rem;border-bottom:1px solid var(--panel-border)}
+.spin-log-entry:last-child{border-bottom:none}
+.spin-log-entry .sle-idx{color:var(--accent);font-weight:700;min-width:24px}
+.spin-log-entry .sle-syms{font-size:.9rem;letter-spacing:1px}
+.spin-log-entry .sle-win{color:var(--gold);font-weight:600;min-width:48px;text-align:right}
+
+/* Receipt Panel */
+.receipt-overlay{position:fixed;inset:0;background:rgba(10,10,20,.95);z-index:100;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto}
+.receipt-card{background:var(--bg2);border:1px solid var(--accent);border-radius:14px;padding:24px;max-width:680px;width:100%;margin:20px 0}
+.receipt-card h2{color:var(--accent);text-align:center;margin-bottom:16px;font-size:1.2rem}
+.receipt-section{margin-bottom:16px}
+.receipt-section h3{font-size:.85rem;color:var(--accent);margin-bottom:8px;border-bottom:1px solid var(--panel-border);padding-bottom:4px}
+.receipt-row{display:flex;justify-content:space-between;align-items:flex-start;padding:4px 0;font-size:.78rem;gap:8px}
+.receipt-row .rl{color:var(--text-dim);flex-shrink:0}
+.receipt-row .rv{font-family:monospace;font-size:.72rem;color:var(--gold);word-break:break-all;text-align:right}
+.receipt-verify{margin-top:6px}
+.receipt-verify-row{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--reel-bg);border-radius:4px;margin-bottom:3px;font-size:.74rem}
+.receipt-verify-row .rv-check{font-size:1rem}
+.receipt-verify-row .rv-idx{color:var(--accent);font-weight:700;min-width:48px}
+.receipt-verify-row .rv-hash{font-family:monospace;font-size:.66rem;color:var(--text-dim);word-break:break-all;flex:1}
+.receipt-verify-row .rv-status{color:var(--accent);font-weight:700}
+.receipt-summary{text-align:center;margin:16px 0;padding:16px;background:var(--reel-bg);border-radius:8px}
+.receipt-summary .big{font-size:1.5rem;margin-bottom:4px}
+.receipt-summary .txt{color:var(--accent);font-weight:700;font-size:1rem}
+.receipt-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.receipt-btns button{padding:10px 20px;border-radius:8px;font-size:.85rem;font-weight:600}
+.btn-copy{background:var(--bg3);color:var(--text)}
+.btn-copy:hover{background:#2a3a5a}
+.btn-new{background:var(--accent);color:#111}
+.btn-new:hover{background:var(--accent2)}
+.copied-toast{color:var(--accent);font-size:.8rem;text-align:center;margin-top:8px;min-height:20px}
+
+/* Hide utility */
+.hidden{display:none!important}
+
+/* Mobile */
+@media(max-width:768px){
+  .main-grid{flex-direction:column}
+  .proof-col{width:100%}
+  .reel{width:56px;height:168px}
+  .reel-cell{width:56px;height:56px;font-size:1.6rem}
+  .setup-card,.beacon-card,.receipt-card{padding:20px}
+  .info-bar{flex-wrap:wrap;gap:6px}
+  .spin-btn{padding:12px 36px;font-size:1rem}
+}
+@media(max-width:400px){
+  .reel{width:48px;height:144px}
+  .reel-cell{width:48px;height:48px;font-size:1.3rem}
+  .reels-container{gap:4px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>&#x1F3B2; FairSeal Game API Demo</h1>
+    <div class="sub">Provably Fair Slot Machine &mdash; Seed Commitment Model</div>
+  </div>
+
+  <!-- Setup Overlay -->
+  <div class="setup-overlay" id="setupOverlay">
+    <div class="setup-card">
+      <h2>&#x1F512; Session Setup</h2>
+      <div class="desc">The server commits to a seed hash <em>before</em> you play. You can verify everything after.</div>
+      <div class="setup-field">
+        <label>Server Seed Commitment (SHA-256)</label>
+        <div class="hash-display" id="commitmentDisplay">Generating...</div>
+      </div>
+      <div class="setup-field">
+        <label>Your Client Seed (optional)</label>
+        <input type="text" id="clientSeedInput" placeholder="Leave blank for random seed">
+      </div>
+      <button class="btn-primary" id="startSessionBtn" onclick="startSession()">Start Session</button>
+    </div>
+  </div>
+
+  <!-- Beacon Overlay -->
+  <div class="beacon-overlay hidden" id="beaconOverlay">
+    <div class="beacon-card">
+      <div class="beacon-spinner" id="beaconSpinner">&#x1F4E1;</div>
+      <h2>Resolving Beacon</h2>
+      <div class="beacon-step" id="bs1"><div class="label">Beacon Round #<span id="beaconRound">—</span></div></div>
+      <div class="beacon-step" id="bs2"><div class="label">Beacon Output</div><div class="val" id="beaconVal">—</div></div>
+      <div class="beacon-step" id="bs3"><div class="label">Session Seed Derived</div><div class="val" id="sessionVal">—</div></div>
+      <div class="beacon-step" id="bs4" style="margin-top:16px"><button class="btn-primary" onclick="finishBeacon()">Let's Play!</button></div>
+    </div>
+  </div>
+
+  <!-- Receipt Overlay -->
+  <div class="receipt-overlay hidden" id="receiptOverlay">
+    <div class="receipt-card">
+      <h2>&#x1F4DC; Session Receipt &amp; Verification</h2>
+      <div class="receipt-section">
+        <h3>&#x1F511; Seeds (now revealed)</h3>
+        <div class="receipt-row"><span class="rl">Server Seed:</span><span class="rv" id="rcptServerSeed">—</span></div>
+        <div class="receipt-row"><span class="rl">Commitment:</span><span class="rv" id="rcptCommitment">—</span></div>
+        <div class="receipt-row"><span class="rl">Client Seed:</span><span class="rv" id="rcptClientSeed">—</span></div>
+        <div class="receipt-row"><span class="rl">Beacon Output:</span><span class="rv" id="rcptBeacon">—</span></div>
+        <div class="receipt-row"><span class="rl">Session Seed:</span><span class="rv" id="rcptSession">—</span></div>
+      </div>
+      <div class="receipt-section">
+        <h3>&#x2705; Spin Verification</h3>
+        <div id="rcptVerifyList"></div>
+      </div>
+      <div class="receipt-section">
+        <h3>&#x1F333; Merkle Root</h3>
+        <div class="receipt-row"><span class="rl">Root:</span><span class="rv" id="rcptMerkle">—</span></div>
+      </div>
+      <div class="receipt-summary">
+        <div class="big" id="rcptResultIcon">—</div>
+        <div class="txt" id="rcptResultText">—</div>
+      </div>
+      <div class="receipt-btns">
+        <button class="btn-copy" onclick="copyReceipt()">&#x1F4CB; Copy Receipt JSON</button>
+        <button class="btn-new" onclick="newSession()">&#x1F504; New Session</button>
+      </div>
+      <div class="copied-toast" id="copiedToast"></div>
+    </div>
+  </div>
+
+  <!-- Main Game Area -->
+  <div class="main-grid" id="mainGrid">
+    <div class="slot-col">
+      <div class="slot-machine" id="slotMachine">
+        <div class="freespin-banner" id="freespinBanner">&#x2B50; FREE SPINS: <span id="freeSpinCount">0</span> remaining</div>
+        <div class="win-display" id="winDisplay">&nbsp;</div>
+        <div class="reels-container" id="reelsContainer"></div>
+        <div class="info-bar">
+          <div class="info-item"><div class="lbl">Balance</div><div class="val green" id="balanceDisplay">$100.00</div></div>
+          <div class="info-item"><div class="lbl">Spin</div><div class="val" id="spinCountDisplay">0 / 10</div></div>
+          <div class="info-item"><div class="lbl">Total Won</div><div class="val" id="totalWonDisplay">$0.00</div></div>
+        </div>
+        <div class="bet-controls">
+          <button class="bet-btn" onclick="changeBet(-0.5)">&#x2212;</button>
+          <div class="bet-display">Bet: $<span id="betDisplay">1.00</span></div>
+          <button class="bet-btn" onclick="changeBet(0.5)">+</button>
+        </div>
+        <button class="spin-btn" id="spinBtn" onclick="doSpin()" disabled>&#x1F3B0; SPIN</button>
+        <br>
+        <button class="close-btn" id="closeBtn" onclick="closeSession()" disabled>Close Session &amp; Verify</button>
+      </div>
+
+      <!-- Spin Log -->
+      <div class="panel" id="spinLogPanel">
+        <h2><span class="icon">&#x1F4CB;</span> Spin History</h2>
+        <div class="spin-log" id="spinLog">
+          <div style="color:var(--text-dim);font-size:.8rem;text-align:center;padding:12px">No spins yet</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="proof-col">
+      <div class="panel proof-panel">
+        <h2><span class="icon">&#x1F50D;</span> Cryptographic Proof</h2>
+        <div class="proof-scroll" id="proofScroll">
+          <div class="proof-entry">
+            <div class="pe-label">Status</div>
+            <div class="pe-note">Waiting for session to start...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// Crypto Utilities (Web Crypto API)
+// ═══════════════════════════════════════════════
+function hexToBytes(hex) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  return bytes;
+}
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function randomHex(bytes) {
+  return bytesToHex(crypto.getRandomValues(new Uint8Array(bytes)));
+}
+async function sha256(input) {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return bytesToHex(new Uint8Array(hash));
+}
+async function hmacSha256(keyHex, dataStr) {
+  const keyBytes = hexToBytes(keyHex);
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const data = new TextEncoder().encode(dataStr);
+  const sig = await crypto.subtle.sign('HMAC', key, data);
+  return bytesToHex(new Uint8Array(sig));
+}
+
+// Merkle tree (binary, SHA-256 of concatenated hex leaves)
+async function merkleRoot(hashes) {
+  if (hashes.length === 0) return '0'.repeat(64);
+  if (hashes.length === 1) return hashes[0];
+  const next = [];
+  for (let i = 0; i < hashes.length; i += 2) {
+    const left = hashes[i];
+    const right = i + 1 < hashes.length ? hashes[i + 1] : left;
+    next.push(await sha256(left + right));
+  }
+  return merkleRoot(next);
+}
+
+// ═══════════════════════════════════════════════
+// Game Constants
+// ═══════════════════════════════════════════════
+const SYMBOLS = ['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣', '🃏'];
+const SYM_NAMES = { '🍒': 'Cherry', '🍋': 'Lemon', '🔔': 'Bell', '⭐': 'Scatter', '💎': 'Diamond', '7️⃣': 'Seven', '🃏': 'Wild' };
+const REELS = 5, ROWS = 3;
+const MAX_SPINS = 10;
+
+// Paytable: symbol → { 3: x, 4: x, 5: x } multiplier on bet
+const PAYTABLE = {
+  '🍒': { 3: 2, 4: 5, 5: 10 },
+  '🍋': { 3: 2, 4: 4, 5: 8 },
+  '🔔': { 3: 3, 4: 8, 5: 15 },
+  '💎': { 3: 5, 4: 15, 5: 40 },
+  '7️⃣': { 3: 10, 4: 30, 5: 100 },
+  '🃏': { 3: 0, 4: 0, 5: 0 } // wild doesn't pay on its own
+};
+const FREE_SPIN_COUNT = 5;
+
+// Weighted symbol distribution per reel (index-based)
+// 0=Cherry,1=Lemon,2=Bell,3=Scatter,4=Diamond,5=Seven,6=Wild
+const REEL_WEIGHTS = [
+  [8, 8, 6, 3, 4, 2, 2], // reel 0
+  [8, 7, 6, 3, 4, 2, 3], // reel 1
+  [7, 8, 6, 4, 4, 2, 2], // reel 2
+  [8, 8, 5, 3, 4, 2, 3], // reel 3
+  [8, 7, 6, 3, 4, 3, 2], // reel 4
+];
+
+// ═══════════════════════════════════════════════
+// Game State
+// ═══════════════════════════════════════════════
+let state = {
+  serverSeed: '',
+  commitment: '',
+  clientSeed: '',
+  beaconRound: 0,
+  beaconOutput: '',
+  sessionSeed: '',
+  balance: 100,
+  bet: 1,
+  totalWon: 0,
+  spinIndex: 0,
+  spinning: false,
+  freeSpins: 0,
+  freeSpinParent: -1,
+  freeSpinSub: 0,
+  sessionActive: false,
+  spins: [], // { index, path, entropy, grid, wins, payout, isFreeSpin, parentIndex, subIndex }
+  grid: Array.from({ length: ROWS }, () => Array(REELS).fill('🍒'))
+};
+
+// ═══════════════════════════════════════════════
+// Initialization
+// ═══════════════════════════════════════════════
+(async function init() {
+  state.serverSeed = randomHex(32);
+  state.commitment = await sha256(state.serverSeed);
+  document.getElementById('commitmentDisplay').textContent = state.commitment;
+  buildReels();
+})();
+
+function buildReels() {
+  const container = document.getElementById('reelsContainer');
+  container.innerHTML = '';
+  for (let r = 0; r < REELS; r++) {
+    const reel = document.createElement('div');
+    reel.className = 'reel';
+    reel.id = 'reel' + r;
+    const inner = document.createElement('div');
+    inner.className = 'reel-inner';
+    inner.id = 'reelInner' + r;
+    for (let row = 0; row < ROWS; row++) {
+      const cell = document.createElement('div');
+      cell.className = 'reel-cell';
+      cell.id = `cell-${r}-${row}`;
+      cell.textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+      inner.appendChild(cell);
+    }
+    reel.appendChild(inner);
+    container.appendChild(reel);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Session Start
+// ═══════════════════════════════════════════════
+async function startSession() {
+  const inp = document.getElementById('clientSeedInput').value.trim();
+  state.clientSeed = inp || randomHex(16);
+  document.getElementById('setupOverlay').classList.add('hidden');
+  document.getElementById('beaconOverlay').classList.remove('hidden');
+
+  // Simulate beacon resolution
+  state.beaconRound = 1000000 + Math.floor(Math.random() * 999999);
+  state.beaconOutput = randomHex(32);
+
+  const bs1 = document.getElementById('bs1');
+  const bs2 = document.getElementById('bs2');
+  const bs3 = document.getElementById('bs3');
+  const bs4 = document.getElementById('bs4');
+
+  document.getElementById('beaconRound').textContent = state.beaconRound;
+  await delay(500);
+  bs1.classList.add('show');
+
+  await delay(600);
+  document.getElementById('beaconVal').textContent = state.beaconOutput;
+  bs2.classList.add('show');
+
+  await delay(500);
+  state.sessionSeed = await hmacSha256(state.serverSeed, state.beaconOutput + state.clientSeed);
+  document.getElementById('sessionVal').textContent = state.sessionSeed;
+  bs3.classList.add('show');
+
+  document.getElementById('beaconSpinner').style.animation = 'none';
+  document.getElementById('beaconSpinner').textContent = '✅';
+  await delay(400);
+  bs4.classList.add('show');
+}
+
+function finishBeacon() {
+  document.getElementById('beaconOverlay').classList.add('hidden');
+  state.sessionActive = true;
+  document.getElementById('spinBtn').disabled = false;
+  document.getElementById('closeBtn').disabled = false;
+  updateProofPanel();
+}
+
+// ═══════════════════════════════════════════════
+// Proof Panel
+// ═══════════════════════════════════════════════
+function updateProofPanel(extraEntries) {
+  const el = document.getElementById('proofScroll');
+  let html = '';
+  html += proofEntry('Commitment', state.commitment, 'SHA-256(serverSeed) — shown before play');
+  html += proofEntry('Client Seed', state.clientSeed);
+  html += proofEntry('Beacon Round', '#' + state.beaconRound);
+  html += proofEntry('Beacon Output', state.beaconOutput);
+  html += proofEntry('Session Seed', state.sessionSeed, 'HMAC(serverSeed, beacon + clientSeed)');
+  if (extraEntries) html += extraEntries;
+  el.innerHTML = html;
+  el.scrollTop = el.scrollHeight;
+}
+
+function proofEntry(label, value, note, current) {
+  return `<div class="proof-entry${current ? ' current' : ''}">
+    <div class="pe-label">${label}</div>
+    <div class="pe-value">${escHtml(value)}</div>
+    ${note ? `<div class="pe-note">${escHtml(note)}</div>` : ''}
+  </div>`;
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ═══════════════════════════════════════════════
+// Spinning
+// ═══════════════════════════════════════════════
+async function doSpin() {
+  if (state.spinning || !state.sessionActive) return;
+  const isFreeSpin = state.freeSpins > 0;
+  if (!isFreeSpin && state.balance < state.bet) return;
+  if (!isFreeSpin && state.spinIndex >= MAX_SPINS) { closeSession(); return; }
+
+  state.spinning = true;
+  const btn = document.getElementById('spinBtn');
+  btn.classList.add('spinning');
+  btn.textContent = '🎰 SPINNING...';
+  btn.disabled = true;
+  document.getElementById('winDisplay').innerHTML = '&nbsp;';
+
+  // Deduct bet (not during free spins)
+  if (!isFreeSpin) state.balance -= state.bet;
+  updateDisplays();
+
+  // Derive entropy
+  let path, entropy;
+  if (isFreeSpin) {
+    path = `spin:${state.freeSpinParent}:freespin:${state.freeSpinSub}`;
+    entropy = await hmacSha256(state.sessionSeed, path);
+    state.freeSpinSub++;
+    state.freeSpins--;
+  } else {
+    path = `spin:${state.spinIndex}`;
+    entropy = await hmacSha256(state.sessionSeed, path);
+  }
+
+  // Map entropy to grid
+  const grid = entropyToGrid(entropy);
+
+  // Animate reels
+  await animateReels(grid);
+
+  // Check wins
+  const { wins, totalMultiplier, scatters } = evaluateWins(grid);
+  const payout = +(state.bet * totalMultiplier).toFixed(2);
+  state.balance += payout;
+  state.totalWon += payout;
+
+  // Record spin
+  const spinRecord = {
+    index: isFreeSpin ? `${state.freeSpinParent}f${state.freeSpinSub - 1}` : state.spinIndex,
+    path,
+    entropy,
+    grid: grid.map(row => row.join('')),
+    wins,
+    payout,
+    isFreeSpin,
+    parentIndex: isFreeSpin ? state.freeSpinParent : null,
+    subIndex: isFreeSpin ? state.freeSpinSub - 1 : null
+  };
+  state.spins.push(spinRecord);
+
+  if (!isFreeSpin) state.spinIndex++;
+
+  // Show win
+  if (payout > 0) {
+    const wd = document.getElementById('winDisplay');
+    wd.textContent = `WIN $${payout.toFixed(2)}!`;
+    wd.className = 'win-display' + (payout >= state.bet * 10 ? ' big' : '');
+    highlightWins(wins);
+  }
+
+  // Free spin trigger
+  if (scatters >= 3 && !isFreeSpin) {
+    state.freeSpins = FREE_SPIN_COUNT;
+    state.freeSpinParent = state.spinIndex - 1;
+    state.freeSpinSub = 0;
+    const banner = document.getElementById('freespinBanner');
+    banner.classList.add('show');
+    document.getElementById('freeSpinCount').textContent = state.freeSpins;
+  }
+
+  // Update displays
+  updateDisplays();
+  addSpinLog(spinRecord);
+
+  // Update proof panel
+  let extra = proofEntry(
+    `Spin ${spinRecord.index}`,
+    entropy,
+    `Path: ${path}`,
+    true
+  );
+  updateProofPanel(extra);
+
+  // Reset button
+  state.spinning = false;
+  btn.classList.remove('spinning');
+
+  if (state.freeSpins > 0) {
+    document.getElementById('freeSpinCount').textContent = state.freeSpins;
+    btn.textContent = '⭐ FREE SPIN';
+    btn.disabled = false;
+  } else {
+    document.getElementById('freespinBanner').classList.remove('show');
+    if (state.spinIndex >= MAX_SPINS) {
+      btn.textContent = '🏁 Session Complete';
+      btn.disabled = true;
+      await delay(1500);
+      closeSession();
+    } else {
+      btn.textContent = '🎰 SPIN';
+      btn.disabled = false;
+    }
+  }
+}
+
+function entropyToGrid(entropyHex) {
+  // Use entropy bytes to pick symbols with weighted distribution
+  const grid = [];
+  for (let row = 0; row < ROWS; row++) {
+    const r = [];
+    for (let col = 0; col < REELS; col++) {
+      const byteIdx = (row * REELS + col) * 2;
+      const byteVal = parseInt(entropyHex.substr(byteIdx, 2), 16);
+      const weights = REEL_WEIGHTS[col];
+      const total = weights.reduce((a, b) => a + b, 0);
+      let pick = byteVal % total;
+      let sym = 0;
+      for (let i = 0; i < weights.length; i++) {
+        pick -= weights[i];
+        if (pick < 0) { sym = i; break; }
+      }
+      r.push(SYMBOLS[sym]);
+    }
+    grid.push(r);
+  }
+  return grid;
+}
+
+function evaluateWins(grid) {
+  const wins = [];
+  let totalMultiplier = 0;
+  let scatters = 0;
+
+  // Count scatters anywhere
+  for (let row = 0; row < ROWS; row++)
+    for (let col = 0; col < REELS; col++)
+      if (grid[row][col] === '⭐') scatters++;
+
+  // Check each row (3 paylines)
+  for (let row = 0; row < ROWS; row++) {
+    const line = grid[row];
+    const result = checkLine(line, row);
+    if (result) {
+      wins.push(result);
+      totalMultiplier += result.multiplier;
+    }
+  }
+
+  // Scatter pay
+  if (scatters >= 3) {
+    const scatterMult = scatters === 3 ? 5 : scatters === 4 ? 20 : 50;
+    totalMultiplier += scatterMult;
+    wins.push({ row: -1, symbol: '⭐', count: scatters, multiplier: scatterMult, cells: [] });
+  }
+
+  return { wins, totalMultiplier, scatters };
+}
+
+function checkLine(line, rowIdx) {
+  // Left-to-right matching, wilds substitute
+  const first = line[0] === '🃏' ? null : line[0];
+  if (first === '⭐') return null; // scatters don't pay on lines
+
+  let matchSym = first;
+  let count = 0;
+  const cells = [];
+
+  for (let i = 0; i < REELS; i++) {
+    const s = line[i];
+    if (s === '⭐') break;
+    if (s === '🃏') {
+      if (!matchSym) { count++; cells.push([i, rowIdx]); continue; }
+      count++;
+      cells.push([i, rowIdx]);
+    } else if (!matchSym) {
+      matchSym = s;
+      count++;
+      cells.push([i, rowIdx]);
+    } else if (s === matchSym) {
+      count++;
+      cells.push([i, rowIdx]);
+    } else break;
+  }
+
+  if (!matchSym || count < 3) return null;
+  const pay = PAYTABLE[matchSym];
+  if (!pay) return null;
+  const multiplier = pay[Math.min(count, 5)] || 0;
+  if (multiplier === 0) return null;
+
+  return { row: rowIdx, symbol: matchSym, count, multiplier, cells };
+}
+
+function highlightWins(wins) {
+  for (const w of wins) {
+    for (const [col, row] of w.cells) {
+      const cell = document.getElementById(`cell-${col}-${row}`);
+      if (cell) cell.classList.add('win-cell');
+    }
+  }
+  setTimeout(() => {
+    document.querySelectorAll('.win-cell').forEach(c => c.classList.remove('win-cell'));
+  }, 2000);
+}
+
+// ═══════════════════════════════════════════════
+// Reel Animation
+// ═══════════════════════════════════════════════
+async function animateReels(finalGrid) {
+  const duration = 1200;
+  const stagger = 200;
+  const interval = 60;
+
+  const promises = [];
+  for (let col = 0; col < REELS; col++) {
+    promises.push(animateReel(col, finalGrid, duration + col * stagger, interval));
+  }
+  await Promise.all(promises);
+}
+
+function animateReel(col, finalGrid, totalMs, intervalMs) {
+  return new Promise(resolve => {
+    const cells = [];
+    for (let row = 0; row < ROWS; row++) {
+      cells.push(document.getElementById(`cell-${col}-${row}`));
+    }
+    const start = Date.now();
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - start;
+      if (elapsed >= totalMs) {
+        clearInterval(timer);
+        for (let row = 0; row < ROWS; row++) {
+          cells[row].textContent = finalGrid[row][col];
+        }
+        resolve();
+      } else {
+        for (let row = 0; row < ROWS; row++) {
+          cells[row].textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+        }
+      }
+    }, intervalMs);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// UI Helpers
+// ═══════════════════════════════════════════════
+function updateDisplays() {
+  document.getElementById('balanceDisplay').textContent = '$' + state.balance.toFixed(2);
+  document.getElementById('spinCountDisplay').textContent = `${state.spinIndex} / ${MAX_SPINS}`;
+  document.getElementById('totalWonDisplay').textContent = '$' + state.totalWon.toFixed(2);
+  document.getElementById('betDisplay').textContent = state.bet.toFixed(2);
+}
+
+function changeBet(delta) {
+  if (state.spinning || state.freeSpins > 0) return;
+  state.bet = Math.max(0.5, Math.min(10, +(state.bet + delta).toFixed(2)));
+  document.getElementById('betDisplay').textContent = state.bet.toFixed(2);
+}
+
+function addSpinLog(record) {
+  const log = document.getElementById('spinLog');
+  if (state.spins.length === 1) log.innerHTML = '';
+  const syms = record.grid[1]; // middle row for display
+  const entry = document.createElement('div');
+  entry.className = 'spin-log-entry';
+  entry.innerHTML = `
+    <span class="sle-idx">#${record.index}</span>
+    <span class="sle-syms">${syms}</span>
+    <span class="sle-win">${record.payout > 0 ? '+$' + record.payout.toFixed(2) : '—'}</span>
+  `;
+  log.prepend(entry);
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ═══════════════════════════════════════════════
+// Session Close & Receipt
+// ═══════════════════════════════════════════════
+async function closeSession() {
+  if (!state.sessionActive) return;
+  state.sessionActive = false;
+  document.getElementById('spinBtn').disabled = true;
+  document.getElementById('closeBtn').disabled = true;
+
+  // Build receipt
+  document.getElementById('rcptServerSeed').textContent = state.serverSeed;
+  document.getElementById('rcptCommitment').textContent = state.commitment;
+  document.getElementById('rcptClientSeed').textContent = state.clientSeed;
+  document.getElementById('rcptBeacon').textContent = state.beaconOutput;
+  document.getElementById('rcptSession').textContent = state.sessionSeed;
+
+  // Verify each spin
+  const list = document.getElementById('rcptVerifyList');
+  list.innerHTML = '';
+  let allPass = true;
+  const spinHashes = [];
+
+  for (const spin of state.spins) {
+    const recomputed = await hmacSha256(state.sessionSeed, spin.path);
+    const match = recomputed === spin.entropy;
+    if (!match) allPass = false;
+    spinHashes.push(spin.entropy);
+
+    const row = document.createElement('div');
+    row.className = 'receipt-verify-row';
+    row.innerHTML = `
+      <span class="rv-check">${match ? '✅' : '❌'}</span>
+      <span class="rv-idx">${spin.isFreeSpin ? 'FS' : 'Spin'} #${spin.index}</span>
+      <span class="rv-hash">${spin.entropy.substr(0, 24)}...</span>
+      <span class="rv-status">${match ? 'PASS' : 'FAIL'}</span>
+    `;
+    list.appendChild(row);
+  }
+
+  // Verify commitment
+  const recomputedCommitment = await sha256(state.serverSeed);
+  const commitMatch = recomputedCommitment === state.commitment;
+  if (!commitMatch) allPass = false;
+
+  // Merkle root
+  const root = await merkleRoot(spinHashes);
+  document.getElementById('rcptMerkle').textContent = root;
+
+  // Summary
+  document.getElementById('rcptResultIcon').textContent = allPass ? '✅' : '❌';
+  document.getElementById('rcptResultText').textContent = allPass
+    ? `Verified: all ${state.spins.length} results match — session is provably fair`
+    : 'Verification failed — some results did not match';
+
+  document.getElementById('receiptOverlay').classList.remove('hidden');
+}
+
+function copyReceipt() {
+  const receipt = {
+    fairseal: { version: '1.0', model: 'seed-commitment' },
+    serverSeed: state.serverSeed,
+    commitment: state.commitment,
+    clientSeed: state.clientSeed,
+    beacon: { round: state.beaconRound, output: state.beaconOutput },
+    sessionSeed: state.sessionSeed,
+    spins: state.spins.map(s => ({
+      index: s.index,
+      path: s.path,
+      entropy: s.entropy,
+      result: s.grid,
+      payout: s.payout,
+      isFreeSpin: s.isFreeSpin
+    })),
+    totalPayout: +state.totalWon.toFixed(2),
+    finalBalance: +state.balance.toFixed(2)
+  };
+
+  navigator.clipboard.writeText(JSON.stringify(receipt, null, 2)).then(() => {
+    document.getElementById('copiedToast').textContent = '✅ Receipt JSON copied to clipboard!';
+    setTimeout(() => { document.getElementById('copiedToast').textContent = ''; }, 3000);
+  }).catch(() => {
+    document.getElementById('copiedToast').textContent = '⚠️ Copy failed — check browser permissions';
+  });
+}
+
+async function newSession() {
+  // Reset everything
+  state = {
+    serverSeed: randomHex(32),
+    commitment: '',
+    clientSeed: '',
+    beaconRound: 0,
+    beaconOutput: '',
+    sessionSeed: '',
+    balance: 100,
+    bet: 1,
+    totalWon: 0,
+    spinIndex: 0,
+    spinning: false,
+    freeSpins: 0,
+    freeSpinParent: -1,
+    freeSpinSub: 0,
+    sessionActive: false,
+    spins: [],
+    grid: Array.from({ length: ROWS }, () => Array(REELS).fill('🍒'))
+  };
+  state.commitment = await sha256(state.serverSeed);
+
+  document.getElementById('receiptOverlay').classList.add('hidden');
+  document.getElementById('setupOverlay').classList.remove('hidden');
+  document.getElementById('commitmentDisplay').textContent = state.commitment;
+  document.getElementById('clientSeedInput').value = '';
+  document.getElementById('winDisplay').innerHTML = '&nbsp;';
+  document.getElementById('spinLog').innerHTML = '<div style="color:var(--text-dim);font-size:.8rem;text-align:center;padding:12px">No spins yet</div>';
+  document.getElementById('freespinBanner').classList.remove('show');
+  document.getElementById('spinBtn').textContent = '🎰 SPIN';
+  document.getElementById('spinBtn').disabled = true;
+  document.getElementById('spinBtn').classList.remove('spinning');
+  document.getElementById('closeBtn').disabled = true;
+
+  // Reset beacon overlay
+  ['bs1','bs2','bs3','bs4'].forEach(id => document.getElementById(id).classList.remove('show'));
+  document.getElementById('beaconSpinner').textContent = '📡';
+  document.getElementById('beaconSpinner').style.animation = 'bspin 1s linear infinite';
+
+  updateDisplays();
+  updateProofPanel();
+  buildReels();
+}
+</script>
+</body>
+</html>

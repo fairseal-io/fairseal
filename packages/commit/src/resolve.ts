@@ -41,7 +41,18 @@ export async function resolveCommitment(commitment: Commitment): Promise<Resolut
   }
 
   // Fetch the beacon round
-  const beaconRound = await beacon.fetchBeacon(commitment.targetRound);
+  let beaconRound;
+  try {
+    beaconRound = await beacon.fetchBeacon(commitment.targetRound);
+  } catch (err) {
+    const msg = err instanceof AggregateError
+      ? err.message
+      : err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Beacon fetch failed: ${msg}. ` +
+      `For offline demos, use beaconId: 'offline' in CommitmentOptions.`
+    );
+  }
 
   // Verify the beacon signature
   const verified = await beacon.verifyBeacon(beaconRound);

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairSeal — 遊戲工作室的可驗證公平基礎設施</title>
+<style>
+  @page { size: A4; margin: 12mm 14mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', Helvetica, Arial, sans-serif;
+    color: #e0e0e0;
+    background: #1a1a2e;
+    line-height: 1.55;
+    font-size: 11.5px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .page {
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 28px 32px 20px;
+  }
+  /* ── Header ── */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #16c79a;
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+  }
+  .logo-area { flex: 1; }
+  .logo {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #ffffff;
+  }
+  .logo span { color: #16c79a; }
+  .tagline {
+    font-size: 13px;
+    color: #16c79a;
+    font-weight: 600;
+    margin-top: 3px;
+    letter-spacing: 0.3px;
+  }
+  .one-liner {
+    margin-top: 5px;
+    font-size: 11px;
+    color: #a0a0b8;
+    font-style: italic;
+  }
+  .header-badge {
+    background: linear-gradient(135deg, #0f3460 0%, #1a1a4e 100%);
+    border: 1px solid #16c79a33;
+    border-radius: 8px;
+    padding: 10px 14px;
+    text-align: center;
+    flex-shrink: 0;
+    margin-left: 20px;
+  }
+  .header-badge .label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #16c79a;
+    font-weight: 700;
+  }
+  .header-badge .val {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 11px;
+    color: #ffffff;
+    margin-top: 4px;
+  }
+
+  /* ── Columns ── */
+  .columns {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 18px;
+  }
+  .col-problem { flex: 0 0 38%; }
+  .col-solution { flex: 1; }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #0f346066;
+  }
+  .col-problem .section-title { color: #ff6b6b; }
+  .col-solution .section-title { color: #16c79a; }
+
+  /* ── Problem list ── */
+  .pain-list {
+    list-style: none;
+    counter-reset: pain;
+  }
+  .pain-list li {
+    counter-increment: pain;
+    position: relative;
+    padding: 6px 0 6px 28px;
+    font-size: 11px;
+    color: #c8c8d8;
+    border-bottom: 1px solid #ffffff08;
+  }
+  .pain-list li:last-child { border-bottom: none; }
+  .pain-list li::before {
+    content: counter(pain);
+    position: absolute;
+    left: 0;
+    top: 6px;
+    width: 20px;
+    height: 20px;
+    background: #ff6b6b18;
+    color: #ff6b6b;
+    border: 1px solid #ff6b6b44;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    text-align: center;
+  }
+  .pain-list .arrow {
+    color: #ff6b6b88;
+    margin: 0 3px;
+  }
+
+  /* ── Solution points ── */
+  .sol-item {
+    padding: 7px 0;
+    border-bottom: 1px solid #ffffff06;
+  }
+  .sol-item:last-child { border-bottom: none; }
+  .sol-label {
+    font-weight: 700;
+    color: #16c79a;
+    font-size: 11.5px;
+    display: inline;
+  }
+  .sol-desc {
+    color: #c8c8d8;
+    font-size: 11px;
+    display: inline;
+  }
+
+  /* ── Comparison Table ── */
+  .table-section {
+    margin-bottom: 16px;
+  }
+  .table-section .section-title {
+    color: #e0e0e0;
+    border-bottom-color: #16c79a44;
+    margin-bottom: 8px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10.5px;
+  }
+  thead th {
+    text-align: left;
+    padding: 6px 10px;
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  thead th:first-child {
+    background: transparent;
+    color: #8888a0;
+    width: 22%;
+  }
+  thead th:nth-child(2) {
+    background: #ff6b6b10;
+    color: #ff6b6b;
+    border-radius: 4px 4px 0 0;
+    width: 39%;
+  }
+  thead th:nth-child(3) {
+    background: #16c79a15;
+    color: #16c79a;
+    border-radius: 4px 4px 0 0;
+    width: 39%;
+  }
+  tbody td {
+    padding: 5px 10px;
+    color: #c0c0d0;
+    border-bottom: 1px solid #ffffff06;
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child {
+    font-weight: 600;
+    color: #a0a0b8;
+    font-size: 10px;
+  }
+  tbody td:nth-child(2) {
+    background: #ff6b6b05;
+    color: #a09090;
+  }
+  tbody td:nth-child(3) {
+    background: #16c79a08;
+    color: #d0e8e0;
+  }
+  .cell-highlight {
+    color: #16c79a !important;
+    font-weight: 600;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    border-top: 2px solid #16c79a;
+    padding-top: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .install-cmd {
+    background: #0f3460;
+    border: 1px solid #16c79a44;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    color: #16c79a;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .install-cmd .prompt { color: #8888a0; margin-right: 6px; }
+  .footer-links {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .footer-links a, .footer-links span {
+    color: #8888a0;
+    text-decoration: none;
+    font-size: 10.5px;
+  }
+  .footer-links .link-label {
+    color: #606078;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    display: block;
+  }
+  .footer-links .link-val { color: #a0a0b8; }
+  .gli-note {
+    width: 100%;
+    text-align: center;
+    font-size: 9.5px;
+    color: #606078;
+    margin-top: 6px;
+    font-style: italic;
+  }
+
+  @media print {
+    body { background: #1a1a2e; }
+    .page { padding: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ════ HEADER ════ -->
+  <div class="header">
+    <div class="logo-area">
+      <div class="logo">Fair<span>Seal</span></div>
+      <div class="tagline">遊戲工作室的可驗證公平基礎設施</div>
+      <div class="one-liner">一行 SDK 取代整套種子管理系統</div>
+    </div>
+    <div class="header-badge">
+      <div class="label">Game API</div>
+      <div class="val">種子承諾模型</div>
+    </div>
+  </div>
+
+  <!-- ════ TWO COLUMNS ════ -->
+  <div class="columns">
+
+    <!-- ── Problem ── -->
+    <div class="col-problem">
+      <div class="section-title">每間 RGS 工作室都遇過的 6 個整合痛點</div>
+      <ol class="pain-list">
+        <li>Nonce 與扣款不同步 <span class="arrow">→</span> 被指控吃單</li>
+        <li>免費旋轉和連消的子序號爆炸</li>
+        <li>Client Seed 控制權爭議 — 營運商 vs. 玩家</li>
+        <li>離線玩家的種子揭露生命週期</li>
+        <li>API 封包膨脹 — 每次旋轉都帶驗證資料</li>
+        <li>GLI-19 認證與玩家輸入的衝突</li>
+      </ol>
+    </div>
+
+    <!-- ── Solution ── -->
+    <div class="col-solution">
+      <div class="section-title">FairSeal 種子承諾模型</div>
+
+      <div class="sol-item">
+        <span class="sol-label">一個 SDK，零生命週期管理 — </span>
+        <span class="sol-desc">Session 種子透過 drand 信標鎖定。無需種子輪換、揭露排程或 nonce 鏈。</span>
+      </div>
+
+      <div class="sol-item">
+        <span class="sol-label">天生防作廢 — </span>
+        <span class="sol-desc">無順序性 nonce 鏈，就不存在需要解釋的缺口。作廢的旋轉只是未使用的衍生路徑。</span>
+      </div>
+
+      <div class="sol-item">
+        <span class="sol-label">樹狀衍生 — </span>
+        <span class="sol-desc">免費旋轉與連消從父級旋轉索引衍生。無限深度，單一營運商交易。</span>
+      </div>
+
+      <div class="sol-item">
+        <span class="sol-label">精簡 API — </span>
+        <span class="sol-desc">旋轉回應僅 <code style="background:#0f3460;padding:1px 5px;border-radius:3px;color:#16c79a;font-size:10px;">{ spinIndex, resultHash }</code>。完整驗證透過 verify.fairseal.io。</span>
+      </div>
+
+      <div class="sol-item">
+        <span class="sol-label">雙模式 — </span>
+        <span class="sol-desc">Mode A：完整可驗證公平（加密貨幣 / Web3）。Mode B：GLI 安全審計模式（受監管市場）。同一 API，設定檔切換。</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════ COMPARISON TABLE ════ -->
+  <div class="table-section">
+    <div class="section-title">架構比較</div>
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>傳統種子鏈</th>
+          <th>FairSeal SCM</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>種子生命週期</td>
+          <td>長期存活，排程揭露</td>
+          <td class="cell-highlight">以 Session 為單位，自動揭露</td>
+        </tr>
+        <tr>
+          <td>作廢處理</td>
+          <td>Nonce 缺口 = 信任違規</td>
+          <td class="cell-highlight">未使用的衍生路徑</td>
+        </tr>
+        <tr>
+          <td>免費旋轉</td>
+          <td>子序號爆炸</td>
+          <td class="cell-highlight">樹狀衍生，無限深度</td>
+        </tr>
+        <tr>
+          <td>封包 / 次旋轉</td>
+          <td>~500 bytes</td>
+          <td class="cell-highlight">~100 bytes（僅 hash）</td>
+        </tr>
+        <tr>
+          <td>驗證時機</td>
+          <td>累積 10K+ 次旋轉後</td>
+          <td class="cell-highlight">Session 結束即可驗證</td>
+        </tr>
+        <tr>
+          <td>GLI-19</td>
+          <td>完全停用可驗證公平</td>
+          <td class="cell-highlight">Mode B 審計模式</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ════ FOOTER ════ -->
+  <div class="footer">
+    <div class="install-cmd">
+      <span class="prompt">$</span>npm install @fairseal/game
+    </div>
+    <div class="footer-links">
+      <div>
+        <span class="link-label">官網</span>
+        <span class="link-val">fairseal.io</span>
+      </div>
+      <div>
+        <span class="link-label">GitHub</span>
+        <span class="link-val">github.com/ned-del/fairseal</span>
+      </div>
+      <div>
+        <span class="link-label">驗證頁面</span>
+        <span class="link-val">verify.fairseal.io</span>
+      </div>
+    </div>
+    <div class="gli-note">GLI-19 v3.0 合規分析報告可依需求提供</div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -3,6 +3,41 @@ import {
   validateRule
 } from "./chunk-AW4Z4AWA.mjs";
 
+// src/crypto.ts
+import { createHash, createHmac, randomBytes } from "crypto";
+function sha256(input) {
+  return createHash("sha256").update(input, "utf8").digest("hex");
+}
+function hmacSha256(keyHex, dataHex) {
+  const key = Buffer.from(keyHex, "hex");
+  const data = Buffer.from(dataHex, "hex");
+  return createHmac("sha256", key).update(data).digest("hex");
+}
+function hashRule(rule) {
+  return sha256(rule);
+}
+function hashInputs(inputs) {
+  const sorted = [...inputs].sort();
+  return sha256(sorted.join("\n"));
+}
+function computeCommitHash(beacon, targetRound, ruleHash, inputsHash, saltHex) {
+  const preimage = [beacon, targetRound.toString(), ruleHash, inputsHash, saltHex].join(":");
+  return sha256(preimage);
+}
+function generateSalt() {
+  return randomBytes(32);
+}
+function toHex(bytes) {
+  return Buffer.from(bytes).toString("hex");
+}
+function fromHex(hex) {
+  return new Uint8Array(Buffer.from(hex, "hex"));
+}
+function deriveOutput(beaconRandomness, ruleHash, inputsHash) {
+  const data = sha256(ruleHash + ":" + inputsHash);
+  return hmacSha256(beaconRandomness, data);
+}
+
 // src/beacon.ts
 var DRAND_QUICKNET = {
   id: "drand:quicknet",
@@ -97,11 +132,98 @@ var DrandBeaconSource = class {
     }
   }
 };
+var OfflineBeaconSource = class {
+  config;
+  constructor() {
+    this.config = {
+      ...DRAND_QUICKNET,
+      id: "offline",
+      relays: []
+      // no network needed
+    };
+  }
+  getRound(unixSeconds) {
+    if (unixSeconds < this.config.genesisTime) {
+      throw new Error(`Timestamp ${unixSeconds} is before genesis ${this.config.genesisTime}`);
+    }
+    return Math.floor((unixSeconds - this.config.genesisTime) / this.config.period) + 1;
+  }
+  getRoundTime(round) {
+    if (round < 1) throw new Error(`Invalid round: ${round}`);
+    return this.config.genesisTime + (round - 1) * this.config.period;
+  }
+  /**
+   * Generate a deterministic beacon from the round number.
+   * randomness = SHA-256("offline-beacon:" + round)
+   * signature  = SHA-256("offline-sig:" + round)
+   * 
+   * ⚠️ NOT cryptographically secure — suitable for demos only.
+   */
+  async fetchBeacon(round) {
+    console.warn("\u26A0\uFE0F  Using offline beacon \u2014 not suitable for production");
+    const randomness = sha256(`offline-beacon:${round}`);
+    const signature = sha256(`offline-sig:${round}`);
+    return { round, randomness, signature };
+  }
+  /**
+   * Offline beacons are self-generated, so "verification" just checks
+   * the deterministic derivation is consistent.
+   */
+  async verifyBeacon(beacon) {
+    const expectedRandomness = sha256(`offline-beacon:${beacon.round}`);
+    const expectedSignature = sha256(`offline-sig:${beacon.round}`);
+    return beacon.randomness === expectedRandomness && beacon.signature === expectedSignature;
+  }
+};
+var CachedBeaconSource = class {
+  config;
+  inner;
+  cache = /* @__PURE__ */ new Map();
+  constructor(inner) {
+    this.inner = inner;
+    this.config = inner.config;
+  }
+  getRound(unixSeconds) {
+    return this.inner.getRound(unixSeconds);
+  }
+  getRoundTime(round) {
+    return this.inner.getRoundTime(round);
+  }
+  async fetchBeacon(round) {
+    const cached = this.cache.get(round);
+    try {
+      const beacon = await this.inner.fetchBeacon(round);
+      this.cache.set(round, beacon);
+      return beacon;
+    } catch (err) {
+      if (cached) {
+        return cached;
+      }
+      throw err;
+    }
+  }
+  async verifyBeacon(beacon) {
+    return this.inner.verifyBeacon(beacon);
+  }
+  /** Check if a round is in the cache. */
+  has(round) {
+    return this.cache.has(round);
+  }
+  /** Pre-populate the cache (e.g. from stored receipts). */
+  seed(beacon) {
+    this.cache.set(beacon.round, beacon);
+  }
+  /** Clear all cached entries. */
+  clear() {
+    this.cache.clear();
+  }
+};
 function createDefaultBeacon() {
   return new DrandBeaconSource();
 }
 var BEACON_REGISTRY = /* @__PURE__ */ new Map([
-  ["drand:quicknet", () => new DrandBeaconSource()]
+  ["drand:quicknet", () => new DrandBeaconSource()],
+  ["offline", () => new OfflineBeaconSource()]
 ]);
 function getBeaconSource(id) {
   const factory = BEACON_REGISTRY.get(id);
@@ -112,41 +234,6 @@ function getBeaconSource(id) {
 }
 function registerBeacon(id, factory) {
   BEACON_REGISTRY.set(id, factory);
-}
-
-// src/crypto.ts
-import { createHash, createHmac, randomBytes } from "crypto";
-function sha256(input) {
-  return createHash("sha256").update(input, "utf8").digest("hex");
-}
-function hmacSha256(keyHex, dataHex) {
-  const key = Buffer.from(keyHex, "hex");
-  const data = Buffer.from(dataHex, "hex");
-  return createHmac("sha256", key).update(data).digest("hex");
-}
-function hashRule(rule) {
-  return sha256(rule);
-}
-function hashInputs(inputs) {
-  const sorted = [...inputs].sort();
-  return sha256(sorted.join("\n"));
-}
-function computeCommitHash(beacon, targetRound, ruleHash, inputsHash, saltHex) {
-  const preimage = [beacon, targetRound.toString(), ruleHash, inputsHash, saltHex].join(":");
-  return sha256(preimage);
-}
-function generateSalt() {
-  return randomBytes(32);
-}
-function toHex(bytes) {
-  return Buffer.from(bytes).toString("hex");
-}
-function fromHex(hex) {
-  return new Uint8Array(Buffer.from(hex, "hex"));
-}
-function deriveOutput(beaconRandomness, ruleHash, inputsHash) {
-  const data = sha256(ruleHash + ":" + inputsHash);
-  return hmacSha256(beaconRandomness, data);
 }
 
 // src/commitment.ts
@@ -204,7 +291,15 @@ async function resolveCommitment(commitment) {
       `Target round ${commitment.targetRound} hasn't elapsed yet. Available at ${new Date(roundTime * 1e3).toISOString()} (${waitSeconds}s from now)`
     );
   }
-  const beaconRound = await beacon.fetchBeacon(commitment.targetRound);
+  let beaconRound;
+  try {
+    beaconRound = await beacon.fetchBeacon(commitment.targetRound);
+  } catch (err) {
+    const msg = err instanceof AggregateError ? err.message : err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Beacon fetch failed: ${msg}. For offline demos, use beaconId: 'offline' in CommitmentOptions.`
+    );
+  }
   const verified = await beacon.verifyBeacon(beaconRound);
   const output = deriveOutput(
     beaconRound.randomness,
@@ -358,8 +453,10 @@ async function verifyReceipt(receipt) {
   };
 }
 export {
+  CachedBeaconSource,
   DRAND_QUICKNET,
   DrandBeaconSource,
+  OfflineBeaconSource,
   applyRule,
   computeCommitHash,
   createCommitment,

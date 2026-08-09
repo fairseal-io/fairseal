@@ -45,6 +45,8 @@ export { verifyReceipt } from './verify.js';
 // Beacon sources
 export {
   DrandBeaconSource,
+  OfflineBeaconSource,
+  CachedBeaconSource,
   createDefaultBeacon,
   getBeaconSource,
   registerBeacon,

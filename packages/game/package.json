@@ -1,0 +1,52 @@
+{
+  "name": "@fairseal/game",
+  "version": "0.1.3",
+  "description": "Game API scaffold (v0.1 ALPHA — offline beacon, not production-ready. Real drand integration in v0.2)",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "test": "jest --runInBand --passWithNoTests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ned-del/fairseal.git",
+    "directory": "packages/game"
+  },
+  "homepage": "https://fairseal.io",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@fairseal/commit": "^0.1.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.1.2",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.12",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "fairseal",
+    "provably-fair",
+    "rng",
+    "gaming",
+    "slots",
+    "gacha",
+    "verifiable",
+    "seed-commitment"
+  ],
+  "license": "MIT"
+}
