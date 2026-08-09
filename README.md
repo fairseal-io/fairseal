@@ -67,11 +67,10 @@ Client-side. No server. No account. No fees for PARTIAL verification.
 
 | Package | Description |
 |---|---|
-| [`@fairseal/commit`](packages/commit) | **Start here.** Committed selection receipts. |
-| [`@fairseal/core`](packages/core) | VEO-2 types, signing, Merkle trees. |
-| [`@fairseal/auto`](packages/auto) | Auto-capture wrapper for AI SDK calls. |
-| [`@fairseal/verify`](packages/verify) | Independent VEO verification. |
-| [`@fairseal/store-sqlite`](packages/store-sqlite) | SQLite persistence for VEO objects. |
+| [`@fairseal/game`](packages/game) | **Game API for RGS studios.** Slots, gacha, loot boxes. (v0.1 ALPHA) |
+| [`@fairseal/commit`](packages/commit) | Committed selection receipts. Core library. |
+| [`@fairseal/core`](packages/core) | Cryptographic primitives, signing, Merkle trees. |
+| [`@fairseal/verify`](packages/verify) | Independent receipt verification. |
 
 ## Use Cases
 
@@ -82,7 +81,7 @@ Client-side. No server. No account. No fees for PARTIAL verification.
 | Matchmaking | Pairing algorithm committed. Players verify no favoritism. |
 | Tournament brackets | Seeding provably random, not rigged. |
 | NFT mint order | Queue provably fair — no insider front-running. |
-| AI agent allocation | Resource distribution with verifiable fairness. |
+| Slot machines | Seed Commitment Model — verifiable spins, no nonce chain. |
 
 ## Links
 
