@@ -351,3 +351,151 @@ describe('verifyReceipt (offline — commitment integrity only)', () => {
     expect(result.status).toBe('INVALID');
   });
 });
+
+// ─── Anchor Security (P0 fix) ──────────────────────────────
+
+describe('verifyReceipt — anchor security', () => {
+  function makeReceiptWithFakeAnchor(): CSReceipt {
+    const commitment = createCommitment({
+      rule: JSON.stringify({ type: 'uniform', pick: 1 }),
+      inputs: ['alice', 'bob', 'charlie'],
+      revealAfter: 10,
+    });
+
+    const fakeRandomness = 'ab'.repeat(32);
+    const output = deriveOutput(fakeRandomness, commitment.ruleHash, commitment.inputsHash);
+    const selection = applyRule(commitment.rule, commitment.inputs, output);
+
+    const resolution: Resolution = {
+      beaconRound: commitment.targetRound,
+      beaconSignature: 'cc'.repeat(48),
+      beaconRandomness: fakeRandomness,
+      verified: true,
+      output,
+      selection,
+    };
+
+    // Create receipt with fabricated on-chain anchor
+    return createReceipt(commitment, resolution, {
+      txHash: '0x' + 'aa'.repeat(32),
+      blockNumber: 12345,
+      blockTimestamp: Math.floor(Date.now() / 1000) - 3600, // 1 hour ago
+      chainId: 8453, // Base
+    });
+  }
+
+  test('on-chain claim without verifyAnchor callback is INVALID (strict mode, default)', async () => {
+    const receipt = makeReceiptWithFakeAnchor();
+    expect(receipt.precedence).toBe('onchain');
+
+    const result = await verifyReceipt(receipt);
+
+    // The receipt claims on-chain anchoring but no callback to verify it.
+    // In strict mode (default), this MUST be INVALID — not PARTIAL.
+    // A verifier that returns PARTIAL for unverifiable on-chain claims
+    // is a security liability in audit/compliance contexts.
+    expect(result.status).toBe('INVALID');
+    expect(result.checks.precedenceVerified).toBe(false);
+    expect(result.reason).toContain('no verifyAnchor callback provided');
+  });
+
+  test('on-chain claim without verifyAnchor is PARTIAL when strictAnchor: false', async () => {
+    const receipt = makeReceiptWithFakeAnchor();
+
+    const result = await verifyReceipt(receipt, { strictAnchor: false });
+
+    // With strictAnchor: false, the caller explicitly opts into accepting
+    // unverified anchor data. Status depends on other checks.
+    // Beacon will fail (fake data) so status is still INVALID here,
+    // but NOT because of the anchor claim.
+    expect(result.checks.precedenceVerified).toBe(false);
+    expect(result.reason).toContain('strictAnchor: false');
+  });
+
+  test('on-chain claim with verifyAnchor rejection is INVALID', async () => {
+    const receipt = makeReceiptWithFakeAnchor();
+
+    const result = await verifyReceipt(receipt, {
+      verifyAnchor: async () => false, // anchor verification fails
+    });
+
+    expect(result.status).toBe('INVALID');
+    expect(result.reason).toContain('rejected by verifyAnchor callback');
+  });
+
+  test('on-chain claim with verifyAnchor that throws is INVALID', async () => {
+    const receipt = makeReceiptWithFakeAnchor();
+
+    const result = await verifyReceipt(receipt, {
+      verifyAnchor: async () => { throw new Error('RPC timeout'); },
+    });
+
+    expect(result.status).toBe('INVALID');
+    expect(result.reason).toContain('Anchor verification failed');
+  });
+
+  test('malformed anchor proof (bad txHash) is INVALID', async () => {
+    const receipt = makeReceiptWithFakeAnchor();
+    receipt.anchor!.txHash = 'not-a-valid-hash';
+
+    const result = await verifyReceipt(receipt);
+
+    expect(result.status).toBe('INVALID');
+    expect(result.reason).toContain('structurally invalid');
+    expect(result.reason).toContain('txHash');
+  });
+
+  test('malformed anchor proof (zero blockNumber) is INVALID', async () => {
+    const receipt = makeReceiptWithFakeAnchor();
+    receipt.anchor!.blockNumber = 0;
+
+    const result = await verifyReceipt(receipt);
+
+    expect(result.status).toBe('INVALID');
+    expect(result.reason).toContain('structurally invalid');
+    expect(result.reason).toContain('blockNumber');
+  });
+
+  test('malformed anchor proof (negative blockTimestamp) is INVALID', async () => {
+    const receipt = makeReceiptWithFakeAnchor();
+    receipt.anchor!.blockTimestamp = -1;
+
+    const result = await verifyReceipt(receipt);
+
+    expect(result.status).toBe('INVALID');
+    expect(result.reason).toContain('structurally invalid');
+    expect(result.reason).toContain('blockTimestamp');
+  });
+
+  test('unattested receipt (no anchor) is unaffected by strict mode', async () => {
+    // Honestly unattested receipts should behave the same regardless of strictAnchor
+    const commitment = createCommitment({
+      rule: JSON.stringify({ type: 'uniform', pick: 1 }),
+      inputs: ['alice', 'bob'],
+      revealAfter: 10,
+    });
+
+    const fakeRandomness = 'ab'.repeat(32);
+    const output = deriveOutput(fakeRandomness, commitment.ruleHash, commitment.inputsHash);
+    const selection = applyRule(commitment.rule, commitment.inputs, output);
+
+    const resolution: Resolution = {
+      beaconRound: commitment.targetRound,
+      beaconSignature: 'cc'.repeat(48),
+      beaconRandomness: fakeRandomness,
+      verified: true,
+      output,
+      selection,
+    };
+
+    const receipt = createReceipt(commitment, resolution); // no anchor
+    expect(receipt.precedence).toBe('unattested');
+
+    const result = await verifyReceipt(receipt);
+    // Should NOT be INVALID due to anchor issues — it's honestly unattested
+    // (Will be INVALID here because fake beacon data fails beacon check,
+    //  but the reason should be about beacon, not anchor)
+    expect(result.reason).toContain('unattested');
+    expect(result.reason).not.toContain('verifyAnchor');
+  });
+});

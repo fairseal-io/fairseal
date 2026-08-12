@@ -10,6 +10,26 @@ import { getBeaconSource } from './beacon.js';
 import { computeCommitHash, deriveOutput, hashInputs, hashRule } from './crypto.js';
 
 /**
+ * Structural validation of an AnchorProof.
+ * Returns null if valid, or a human-readable error string.
+ */
+function validateAnchorStructure(anchor: AnchorProof): string | null {
+  if (!anchor.txHash || typeof anchor.txHash !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(anchor.txHash)) {
+    return 'Invalid txHash format (expected 0x-prefixed 32-byte hex)';
+  }
+  if (typeof anchor.blockNumber !== 'number' || !Number.isInteger(anchor.blockNumber) || anchor.blockNumber <= 0) {
+    return 'Invalid blockNumber (expected positive integer)';
+  }
+  if (typeof anchor.blockTimestamp !== 'number' || anchor.blockTimestamp <= 0) {
+    return 'Invalid blockTimestamp (expected positive Unix timestamp)';
+  }
+  if (typeof anchor.chainId !== 'number' || !Number.isInteger(anchor.chainId) || anchor.chainId <= 0) {
+    return 'Invalid chainId (expected positive integer)';
+  }
+  return null;
+}
+
+/**
  * Verify a complete Committed Selection Receipt.
  * 
  * Performs five independent checks:
@@ -21,6 +41,12 @@ import { computeCommitHash, deriveOutput, hashInputs, hashRule } from './crypto.
  * 
  * Returns VALID if all checks pass, PARTIAL if some pass (e.g. unattested
  * precedence), INVALID if any critical check fails.
+ * 
+ * **Security note:** Receipts claiming `precedence: 'onchain'` are INVALID
+ * by default unless a `verifyAnchor` callback is provided and succeeds.
+ * Self-reported anchor data is never trusted without on-chain verification.
+ * Set `strictAnchor: false` to explicitly opt into accepting unverified
+ * on-chain claims (NOT recommended for audit/compliance use cases).
  * 
  * @example
  * ```typescript
@@ -35,6 +61,15 @@ export async function verifyReceipt(
   options?: {
     /** Optional callback for on-chain anchor verification */
     verifyAnchor?: (anchor: AnchorProof, commitHash: string) => Promise<boolean>;
+    /**
+     * When true (default), receipts claiming on-chain precedence are INVALID
+     * unless verifyAnchor callback is provided and succeeds. Self-reported
+     * anchor data is never trusted without independent verification.
+     * 
+     * Set to false ONLY when anchor verification is handled externally
+     * and you accept the security implications.
+     */
+    strictAnchor?: boolean;
   }
 ): Promise<VerificationResult> {
   const checks = {
@@ -45,6 +80,8 @@ export async function verifyReceipt(
     selectionVerified: false,
   };
   const reasons: string[] = [];
+  /** Tracks whether an on-chain claim was made but could not be verified */
+  let anchorClaimUnverified = false;
 
   const { commitment, anchor, resolution } = receipt;
 
@@ -77,8 +114,16 @@ export async function verifyReceipt(
   }
 
   // ─── Check 2: Precedence ──────────────────────────────────
+  const strictAnchor = options?.strictAnchor !== false; // default: true
+
   if (anchor && receipt.precedence === 'onchain') {
-    if (options?.verifyAnchor) {
+    // Step 2a: Structural validation — reject malformed anchor proofs immediately
+    const structError = validateAnchorStructure(anchor);
+    if (structError) {
+      anchorClaimUnverified = true;
+      reasons.push(`Anchor proof structurally invalid: ${structError}`);
+    } else if (options?.verifyAnchor) {
+      // Step 2b: On-chain verification via caller-provided callback
       try {
         const anchorValid = await options.verifyAnchor(anchor, commitment.commitHash);
         if (anchorValid) {
@@ -90,17 +135,32 @@ export async function verifyReceipt(
             reasons.push('Anchor timestamp does not precede target round time');
           }
         } else {
+          anchorClaimUnverified = true;
           reasons.push('Anchor proof rejected by verifyAnchor callback');
         }
       } catch (err) {
+        anchorClaimUnverified = true;
         reasons.push(`Anchor verification failed: ${err}`);
       }
     } else {
-      // No verifyAnchor callback — cannot trust self-reported anchor data
-      reasons.push(
-        'Anchor proof present but cannot be independently verified without an RPC provider. ' +
-        'Pass verifyAnchor callback for on-chain verification.'
-      );
+      // No verifyAnchor callback — receipt claims on-chain but we cannot verify.
+      // This is a security-critical distinction: self-reported anchor data
+      // MUST NOT be trusted without independent verification.
+      anchorClaimUnverified = true;
+      if (strictAnchor) {
+        reasons.push(
+          'Receipt claims on-chain precedence but no verifyAnchor callback provided. ' +
+          'Self-reported anchor data cannot be trusted without independent on-chain verification. ' +
+          'Pass a verifyAnchor callback, or set strictAnchor: false to accept unverified claims (not recommended).'
+        );
+      } else {
+        reasons.push(
+          'Anchor proof present but not independently verified (strictAnchor: false). ' +
+          'Self-reported anchor data accepted without on-chain verification — NOT suitable for audit/compliance.'
+        );
+        // In non-strict mode, we don't block on this, but precedenceVerified stays false
+        anchorClaimUnverified = false; // caller explicitly opted out
+      }
     }
   } else if (receipt.precedence === 'unattested') {
     reasons.push('Precedence is unattested — commitment timing cannot be independently verified');
@@ -172,7 +232,13 @@ export async function verifyReceipt(
 
   const coreChecks = checks.commitmentIntegrity && checks.beaconVerified && checks.outputVerified;
   
-  if (coreChecks && checks.selectionVerified) {
+  if (anchorClaimUnverified) {
+    // Receipt claimed on-chain precedence but anchor could not be verified.
+    // This is INVALID regardless of other checks — an unverifiable on-chain
+    // claim in an audit context is worse than no claim at all.
+    // A verifier that returns PARTIAL for fabricated anchors is a liability.
+    status = 'INVALID';
+  } else if (coreChecks && checks.selectionVerified) {
     // All checks pass
     status = checks.precedenceVerified ? 'VALID' : 'PARTIAL';
   } else if (coreChecks && !checks.selectionVerified) {
