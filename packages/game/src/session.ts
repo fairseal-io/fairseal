@@ -21,10 +21,27 @@ export async function createSession(config: GameSessionConfig): Promise<GameSess
   const serverSeedHash = createHash('sha256').update(config.serverSeed).digest('hex');
   const sessionId = 'fs_' + randomBytes(6).toString('hex');
 
-  // v0.1.0: offline beacon (immediate resolution)
-  // Future: integrate with @fairseal/commit for real drand
-  const beaconOutput = randomBytes(32).toString('hex');
-  const beaconRound = Math.floor(Date.now() / 3000); // simulated round
+  // Determine beacon source and security mode
+  const isOfflineBeacon = !config.beaconId || config.beaconId === 'offline';
+  let beaconOutput: string;
+  let beaconRound: number;
+
+  if (isOfflineBeacon) {
+    // Offline/test beacon: deterministic but NOT cryptographically secure.
+    // Receipts from this beacon are poisoned with securityMode: 'test'.
+    beaconOutput = randomBytes(32).toString('hex');
+    beaconRound = Math.floor(Date.now() / 3000); // simulated round
+  } else {
+    // Future: integrate with @fairseal/commit's DrandBeaconSource for real beacons
+    // For now, any non-offline beaconId falls back to offline with a warning
+    console.warn(
+      `\u26A0\uFE0F  Beacon '${config.beaconId}' not yet supported in @fairseal/game. ` +
+      `Using offline beacon (securityMode: 'test'). ` +
+      `Use @fairseal/commit for production drand beacon integration.`
+    );
+    beaconOutput = randomBytes(32).toString('hex');
+    beaconRound = Math.floor(Date.now() / 3000);
+  }
 
   // Derive session seed
   // Mode A (provably-fair): beacon + clientSeed
@@ -46,6 +63,7 @@ export async function createSession(config: GameSessionConfig): Promise<GameSess
     beaconOutput,
     mode: config.mode,
     paytableHash: config.paytableHash,
+    securityMode: isOfflineBeacon ? 'test' as const : 'production' as const,
     state: 'active',
     _serverSeed: config.serverSeed,
     _clientSeed: config.clientSeed,
@@ -94,6 +112,7 @@ export async function closeSession(session: GameSession): Promise<SessionReceipt
     beaconRound: session.beaconRound,
     beaconOutput: session.beaconOutput,
     paytableHash: session.paytableHash,
+    securityMode: session.securityMode,
     serverSeed: session._serverSeed,
     clientSeed: session._clientSeed,
     spinLog: [...session._spinLog],

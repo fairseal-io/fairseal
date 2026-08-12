@@ -81,9 +81,25 @@ export function verifySession(receipt: SessionReceipt): VerificationResult {
   const recomputedMerkleRoot = computeMerkleRoot(leaves);
   const merkleValid = recomputedMerkleRoot === receipt.merkleRoot;
 
-  // 5. Beacon verification (v0.1.0: offline beacon always valid)
-  // v0.1: offline beacon — cannot verify. Returns null to signal unverified.
-  const beaconValid: boolean | null = null;
+  // 5. Beacon verification
+  // A conforming verifier MUST produce a definitive boolean — never null.
+  // Test-mode receipts always fail beacon verification by design.
+  let beaconValid: boolean;
+
+  if (receipt.securityMode === 'test') {
+    // Test/offline beacon: deterministic, NOT cryptographically attested.
+    // This is by design — test receipts are poisoned to prevent misuse.
+    beaconValid = false;
+  } else if (receipt.securityMode === 'production') {
+    // Production beacon: would verify drand BLS12-381 signature.
+    // TODO: integrate with @fairseal/commit's verifyBeacon() for real verification.
+    // For now, production mode without drand integration = not verifiable.
+    beaconValid = false;
+  } else {
+    // Missing or unknown securityMode: legacy receipt without mode field.
+    // Treat as unverified — fail closed.
+    beaconValid = false;
+  }
 
   const valid = commitmentValid && allSpinsValid && merkleValid;
 
@@ -95,8 +111,19 @@ export function verifySession(receipt: SessionReceipt): VerificationResult {
   }
   if (!merkleValid) issues.push('Merkle root mismatch');
 
+  // Beacon and security mode warnings
+  if (receipt.securityMode === 'test') {
+    issues.push('SECURITY: Receipt uses test/offline beacon — NOT CRYPTOGRAPHICALLY ATTESTED. Do not use for audit or compliance.');
+  } else if (!beaconValid) {
+    issues.push('Beacon signature not verified — drand integration pending');
+  }
+
+  const securityWarning = receipt.securityMode === 'test'
+    ? ' ⚠️ TEST MODE — NOT CRYPTOGRAPHICALLY ATTESTED.'
+    : '';
+
   const summary = valid
-    ? `Session ${receipt.sessionId}: ${receipt.spinLog.length} spins verified. All results match.`
+    ? `Session ${receipt.sessionId}: ${receipt.spinLog.length} spins verified. All results match.${securityWarning}`
     : `Session ${receipt.sessionId}: Verification FAILED. ${issues.join('; ')}.`;
 
   return {

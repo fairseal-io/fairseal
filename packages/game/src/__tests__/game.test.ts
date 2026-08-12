@@ -79,9 +79,12 @@ describe('@fairseal/game', () => {
       const result = verifySession(receipt);
       expect(result.valid).toBe(true);
       expect(result.merkleValid).toBe(true);
-      expect(result.beaconValid).toBe(true);
+      // Offline beacon → beaconValid is false (test mode, NOT cryptographically attested)
+      // This is correct behavior: test receipts are poisoned by design.
+      expect(result.beaconValid).toBe(false);
       expect(result.summary).toContain('5 spins verified');
       expect(result.summary).toContain('All results match');
+      expect(result.summary).toContain('TEST MODE');
 
       // All spins (including sub-results) should be valid
       for (const s of result.spins) {

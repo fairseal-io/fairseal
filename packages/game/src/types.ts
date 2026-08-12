@@ -50,6 +50,9 @@ export interface GameSession {
   /** Committed paytable hash. */
   paytableHash: string;
 
+  /** Security mode (inherited from beacon source). */
+  securityMode: 'production' | 'test';
+
   /** Session state. */
   state: 'pending' | 'active' | 'closed' | 'expired';
 
@@ -116,6 +119,15 @@ export interface SessionReceipt {
   beaconOutput: string;
   paytableHash: string;
 
+  /**
+   * Security mode indicating beacon source trustworthiness.
+   * - 'production': beacon from drand or other cryptographically verified source
+   * - 'test': deterministic/offline beacon — NOT cryptographically attested.
+   *   Receipts with securityMode 'test' MUST NOT be used for audit or compliance.
+   *   Verifiers MUST reject test receipts in production verification contexts.
+   */
+  securityMode: 'production' | 'test';
+
   /** Server seed (revealed at session close). */
   serverSeed: string;
 
@@ -147,8 +159,13 @@ export interface VerificationResult {
     expected: string;
     actual: string;
   }>;
-  /** Beacon verification (drand signature check). */
-  beaconValid: boolean | null;
+  /**
+   * Beacon verification result.
+   * - true: beacon signature cryptographically verified
+   * - false: beacon not verified (test mode, offline, or verification failed)
+   * MUST NEVER be null. A conforming verifier always produces a definitive result.
+   */
+  beaconValid: boolean;
   /** Merkle root verification. */
   merkleValid: boolean;
   /** Anchor verification (if anchored). */
