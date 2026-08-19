@@ -21,32 +21,40 @@ When your game drops loot, runs a gacha pull, or makes any randomized selection 
 npm install @fairseal/commit
 ```
 
+Copy-paste runnable (Node.js ≥ 18, ESM or ts-node):
+
 ```typescript
 import { createCommitment, resolveCommitment, createReceipt, verifyReceipt } from '@fairseal/commit';
 
 // 1. Commit to your rule BEFORE the outcome is knowable
 const commitment = createCommitment({
-  rule: JSON.stringify({ type: 'my-loot-table-v3', seed: true }),
+  rule: JSON.stringify({ type: 'uniform', pick: 1 }),
   inputs: ['SSR_Dragon', 'SR_Phoenix', 'R_Shield', 'N_Sword'],
-  revealAfter: 10, // seconds until reveal
+  revealAfter: 10, // seconds until the beacon round
 });
 // commitment.commitHash is now locked — can't be changed
 
-// 2. Wait for the drand beacon round...
-// (your game continues normally)
-
-// 3. Resolve: fetch the public randomness, derive the result
-const resolution = await resolveCommitment(commitment);
+// 2–3. Resolve: { wait: true } polls until the beacon round is available
+//    (max ~15s by default — no manual sleep needed)
+const resolution = await resolveCommitment(commitment, { wait: true });
 // resolution.beaconRandomness = verifiable entropy from drand
-// Use this entropy with YOUR algorithm to determine the drop
+// resolution.selection        = built-in rule result (e.g. one of your inputs)
 
 // 4. Package as a portable receipt
 const receipt = createReceipt(commitment, resolution);
 
 // 5. Anyone can verify — no trust in you required
 const proof = await verifyReceipt(receipt);
-// proof.status = 'PARTIAL' (or 'VALID' with on-chain anchoring)
+console.log(proof.status, resolution.selection);
+// → "PARTIAL" + your selected item
 ```
+
+> **Expected:** a self-issued receipt that is **not anchored on-chain** verifies as
+> `status: 'PARTIAL'` (precedence `unattested`) — the math and entropy check out, but
+> timing isn't third-party provable. That is the expected result here, **not** a
+> failure. Only `INVALID` means verification failed.
+
+Prefer an explicit helper? `waitAndResolve(commitment)` ≡ `resolveCommitment(commitment, { wait: true })`.
 
 ## How Operators Integrate
 
@@ -74,8 +82,8 @@ const commitment = createCommitment({
   revealAfter: 10,
 });
 
-// Step 2: After beacon round elapses, resolve
-const resolution = await resolveCommitment(commitment);
+// Step 2: Resolve (waits for the beacon round automatically)
+const resolution = await resolveCommitment(commitment, { wait: true });
 
 // Step 3: Use YOUR weighted algorithm with the verifiable entropy
 const drop = yourWeightedPull(LOOT_TABLE, resolution.beaconRandomness);
@@ -178,11 +186,22 @@ createCommitment({
 
 Returns: `Commitment` with `commitHash`, `targetRound`, `ruleHash`, etc.
 
-### `resolveCommitment(commitment)`
+### `resolveCommitment(commitment, opts?)`
 
-After the beacon round elapses, fetches the randomness and verifies the BLS signature.
+Fetches the beacon randomness and verifies the BLS signature.
+
+```typescript
+resolveCommitment(commitment, {
+  wait?: boolean,      // poll until the target round is available (default: false — throws if early)
+  maxWaitMs?: number,  // wait budget when wait=true (default: 15000)
+})
+```
 
 Returns: `Resolution` with `beaconRandomness`, `verified`, `output`, etc.
+
+### `waitAndResolve(commitment, opts?)`
+
+Convenience wrapper for `resolveCommitment(commitment, { wait: true })`.
 
 ### `createReceipt(commitment, resolution, anchor?)`
 

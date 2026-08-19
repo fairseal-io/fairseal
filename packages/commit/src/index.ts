@@ -22,8 +22,8 @@
  * // 2. (Optional) Anchor on-chain for third-party verifiability
  * // const anchor = await anchorCommitment(commitment, walletClient);
  * 
- * // 3. After the beacon round elapses, resolve the selection
- * const resolution = await resolveCommitment(commitment);
+ * // 3. Resolve the selection ({ wait: true } polls until the round is available)
+ * const resolution = await resolveCommitment(commitment, { wait: true });
  * console.log(resolution.selection); // "alice"
  * 
  * // 4. Create a portable receipt
@@ -39,7 +39,8 @@
 
 // Core functions
 export { createCommitment } from './commitment.js';
-export { resolveCommitment, createReceipt } from './resolve.js';
+export { resolveCommitment, waitAndResolve, createReceipt } from './resolve.js';
+export type { ResolveOptions } from './resolve.js';
 export { verifyReceipt } from './verify.js';
 
 // Beacon sources
