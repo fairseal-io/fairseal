@@ -1,19 +1,21 @@
-# @openrng/core
+# @fairseal/core
 
-> VEO-2 types, schema, and shared primitives for the OpenRNG ecosystem.
+> Part of [FairSeal](https://fairseal.io) — formerly OpenRNG.
+
+> VEO-2 types, schema, and shared primitives for the FairSeal ecosystem.
 
 **VEO** = Verifiable Execution Object — a standard format for recording, proving, and explaining AI decisions.
 
 ## Install
 
 ```bash
-npm install @openrng/core
+npm install @fairseal/core
 ```
 
 ## Quick Start
 
 ```typescript
-import { createVEO, validateVEO, createVEOHash } from '@openrng/core';
+import { createVEO, validateVEO, createVEOHash } from '@fairseal/core';
 
 // Create a VEO for an AI execution
 const veo = createVEO({
@@ -52,18 +54,18 @@ created → signed → anchored → indexed → verified
 
 ## Full Spec
 
-- [RFC-0002: VEO-2](https://github.com/ned-del/openrng/blob/main/docs/rfc/RFC-0002-VEO2.md)
-- [JSON Schema](https://github.com/ned-del/openrng/blob/main/schemas/veo-2.schema.json)
-- [Example VEO objects](https://github.com/ned-del/openrng/tree/main/docs/rfc/veo-2-examples)
+- [RFC-0002: VEO-2](https://github.com/fairseal-io/fairseal/blob/main/docs/rfc/RFC-0002-VEO2.md)
+- [JSON Schema](https://github.com/fairseal-io/fairseal/blob/main/schemas/veo-2.schema.json)
+- [Example VEO objects](https://github.com/fairseal-io/fairseal/tree/main/docs/rfc/veo-2-examples)
 
 ## Related Packages
 
 | Package | Purpose |
 |---|---|
-| `@openrng/core` | Types, schema, validation (this package) |
-| `@openrng/verify` | Verify any VEO object |
-| `@openrng/auto` | Auto-instrument AI SDK calls |
+| `@fairseal/core` | Types, schema, validation (this package) |
+| `@fairseal/verify` | Verify any VEO object |
+| `@fairseal/auto` | Auto-instrument AI SDK calls |
 
 ## License
 
-MIT — [OpenRNG](https://openrng.io)
+MIT — [FairSeal](https://fairseal.io)

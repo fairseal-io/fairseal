@@ -1,6 +1,6 @@
 {
   "name": "@fairseal/auto",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Auto-instrument AI SDK calls to emit VEO-2 objects. One line, zero code changes.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

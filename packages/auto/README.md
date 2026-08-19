@@ -1,18 +1,20 @@
-# @openrng/auto
+# @fairseal/auto
+
+> Part of [FairSeal](https://fairseal.io) — formerly OpenRNG.
 
 > Auto-instrument AI SDK calls to emit VEO-2 objects. One line, zero code changes.
 
 ## Install
 
 ```bash
-npm install @openrng/auto @openrng/core
+npm install @fairseal/auto @fairseal/core
 ```
 
 ## Quick Start
 
 ```typescript
 import OpenAI from 'openai';
-import { auto } from '@openrng/auto';
+import { auto } from '@fairseal/auto';
 
 // Wrap your existing client — one line
 const client = auto(new OpenAI());
@@ -30,7 +32,7 @@ const response = await client.chat.completions.create({
 
 ```typescript
 import Anthropic from '@anthropic-ai/sdk';
-import { auto } from '@openrng/auto';
+import { auto } from '@fairseal/auto';
 
 const client = auto(new Anthropic());
 
@@ -43,8 +45,8 @@ const message = await client.messages.create({
 ## With Signing
 
 ```typescript
-import { auto } from '@openrng/auto';
-import { generateSigningKeys } from '@openrng/core';
+import { auto } from '@fairseal/auto';
+import { generateSigningKeys } from '@fairseal/core';
 
 const keys = generateSigningKeys();
 const client = auto(new OpenAI(), {
@@ -57,7 +59,7 @@ const client = auto(new OpenAI(), {
 ## Accessing VEOs
 
 ```typescript
-import { auto, MemoryStore } from '@openrng/auto';
+import { auto, MemoryStore } from '@fairseal/auto';
 
 const store = new MemoryStore();
 const client = auto(new OpenAI(), { store });
@@ -114,9 +116,9 @@ Every instrumented call produces a VEO with:
 
 | Package | Purpose |
 |---|---|
-| `@openrng/core` | Types, schema, signing, validation |
-| `@openrng/auto` | Auto-instrumentation (this package) |
+| `@fairseal/core` | Types, schema, signing, validation |
+| `@fairseal/auto` | Auto-instrumentation (this package) |
 
 ## License
 
-MIT — [OpenRNG](https://openrng.io)
+MIT — [FairSeal](https://fairseal.io)
