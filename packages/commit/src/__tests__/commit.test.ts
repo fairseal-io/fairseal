@@ -10,12 +10,12 @@
  */
 
 import { createCommitment } from '../commitment';
-import { DrandBeaconSource, DRAND_QUICKNET } from '../beacon';
+import { DrandBeaconSource, DRAND_QUICKNET, OfflineBeaconSource, getBeaconSource, registerBeacon } from '../beacon';
 import { sha256, hashRule, hashInputs, computeCommitHash, deriveOutput, toHex } from '../crypto';
 import { applyRule, validateRule } from '../rules';
 import { verifyReceipt } from '../verify';
 import { createReceipt } from '../resolve';
-import type { Commitment, Resolution, CSReceipt } from '../types';
+import type { Commitment, Resolution, CSReceipt, BeaconRound, BeaconSource, BeaconConfig } from '../types';
 
 // ─── Crypto Primitives ─────────────────────────────────────
 
@@ -497,5 +497,285 @@ describe('verifyReceipt — anchor security', () => {
     //  but the reason should be about beacon, not anchor)
     expect(result.reason).toContain('unattested');
     expect(result.reason).not.toContain('verifyAnchor');
+  });
+});
+
+// ─── Batch 2: Fail-Closed Beacon Verification (P0 Fix) ─────────────────────────────────────
+//
+// These tests verify that verifyReceipt() is fail-closed on beacon verification:
+//   1. Offline beacon receipts are always INVALID (no BLS signatures)
+//   2. Zero/garbage signatures that match relay data still fail BLS verification
+//   3. Mock beacon where verifyBeacon() returns false is rejected
+//   4. Missing/empty beacon fields are rejected
+//
+// None of these tests require network calls. They use either the offline beacon
+// (deterministic) or a mock beacon injected via registerBeacon().
+//
+// Background: verifyReceipt() previously only compared relay-fetched data against
+// the receipt without calling verifyBeacon(). This allowed offline beacon receipts
+// to pass with beaconVerified:true, and compromised-relay attacks to succeed.
+// Fixed in Batch 2 (2026-09-07) on branch fix/commit-fail-closed-batch2.
+
+/**
+ * Create a minimal mock BeaconSource for testing.
+ * Allows controlling what fetchBeacon() returns and what verifyBeacon() returns.
+ */
+function createMockBeacon(
+  fetchResult: BeaconRound,
+  verifyResult: boolean,
+  id: string = 'mock:test',
+): BeaconSource {
+  const config: BeaconConfig = {
+    id,
+    chainHash: '0'.repeat(64),
+    period: 3,
+    genesisTime: 1692803367,
+    publicKey: '0'.repeat(192),
+    relays: ['https://mock.example.com'],
+  };
+  return {
+    config,
+    getRound: (t: number) => Math.floor((t - config.genesisTime) / config.period) + 1,
+    getRoundTime: (r: number) => config.genesisTime + (r - 1) * config.period,
+    fetchBeacon: async (_round: number) => fetchResult,
+    verifyBeacon: async (_beacon: BeaconRound) => verifyResult,
+  };
+}
+
+describe('verifyReceipt — fail-closed beacon verification (Batch 2 P0 fix)', () => {
+  // ── Helper: build a receipt using a specific beacon ID ──────────────────────
+  function makeReceiptForBeacon(
+    beaconId: string,
+    beaconRandomness: string,
+    beaconSignature: string,
+  ): CSReceipt {
+    const commitment = createCommitment({
+      rule: JSON.stringify({ type: 'uniform', pick: 1 }),
+      inputs: ['alice', 'bob', 'charlie'],
+      revealAfter: 10,
+      beacon: beaconId,
+    });
+
+    const output = deriveOutput(beaconRandomness, commitment.ruleHash, commitment.inputsHash);
+    const selection = applyRule(commitment.rule, commitment.inputs, output);
+
+    const resolution: Resolution = {
+      beaconRound: commitment.targetRound,
+      beaconSignature,
+      beaconRandomness,
+      verified: true, // self-reported; verifyReceipt must NOT trust this field
+      output,
+      selection,
+    };
+
+    return createReceipt(commitment, resolution);
+  }
+
+  // ── Test 1: Offline beacon — reject regardless of data consistency ──────────
+  test('[NEG-1] Offline beacon receipt is INVALID (beaconVerified:false) — no BLS present', async () => {
+    // Build a receipt that is internally consistent with the offline beacon
+    // (randomness and signature are correctly derived sha256 values — they
+    // WOULD pass the old relay-match check). After the fix, offline beacon
+    // must be explicitly rejected before any relay fetch.
+    const offlineSrc = new OfflineBeaconSource();
+    // We need a round number; use a fixed one known to be past genesis
+    const round = offlineSrc.getRound(Math.floor(Date.now() / 1000) + 10);
+    const offlineRandomness = sha256(`offline-beacon:${round}`);
+    const offlineSignature = sha256(`offline-sig:${round}`);
+
+    const commitment = createCommitment({
+      rule: JSON.stringify({ type: 'uniform', pick: 1 }),
+      inputs: ['alice', 'bob', 'charlie'],
+      revealAfter: 10,
+      beacon: 'offline',
+    });
+
+    const output = deriveOutput(offlineRandomness, commitment.ruleHash, commitment.inputsHash);
+    const selection = applyRule(commitment.rule, commitment.inputs, output);
+
+    const resolution: Resolution = {
+      beaconRound: commitment.targetRound,
+      beaconSignature: offlineSignature,
+      beaconRandomness: offlineRandomness,
+      verified: true, // attacker-set; must NOT be trusted
+      output,
+      selection,
+    };
+
+    const receipt = createReceipt(commitment, resolution);
+    const result = await verifyReceipt(receipt);
+
+    // Must fail-closed: offline beacon provides no BLS
+    expect(result.checks.beaconVerified).toBe(false);
+    expect(result.status).toBe('INVALID');
+    expect(result.reason).toMatch(/[Oo]ffline beacon/);
+    expect(result.reason).toMatch(/BLS|bls|cryptographic/);
+  });
+
+  // ── Test 2: Zero-byte signature — fails BLS even if relay-consistent ────────
+  test('[NEG-2] All-zero signature fails BLS verification (INVALID) via mock beacon', async () => {
+    // Register a mock beacon that returns all-zero data from fetchBeacon()
+    // but whose verifyBeacon() returns false (simulating a real BLS failure
+    // that would occur with a zero or garbage signature).
+    const zeroSignature = '00'.repeat(48);
+    const zeroRandomness = '00'.repeat(32);
+    const mockId = 'mock:zero-sig';
+    const mockBeacon = createMockBeacon(
+      { round: 99999, randomness: zeroRandomness, signature: zeroSignature },
+      false, // verifyBeacon returns false — zero sig cannot be valid BLS
+      mockId,
+    );
+    registerBeacon(mockId, () => mockBeacon);
+
+    const receipt = makeReceiptForBeacon(mockId, zeroRandomness, zeroSignature);
+    const result = await verifyReceipt(receipt);
+
+    // Must fail-closed: relay data matches but BLS rejected
+    expect(result.checks.beaconVerified).toBe(false);
+    expect(result.status).toBe('INVALID');
+    expect(result.reason).toMatch(/BLS|bls|cryptographic|forgery|fail-closed/i);
+  });
+
+  // ── Test 3: Tampered payload — forged randomness rejected ────────────────
+  test('[NEG-3] Tampered randomness in receipt is INVALID (relay mismatch)', async () => {
+    // Mock beacon serves real-ish data, but the receipt has tampered randomness
+    const realRandomness = 'aa'.repeat(32);
+    const realSignature = 'bb'.repeat(48);
+    const tamperedRandomness = 'ff'.repeat(32); // different from what relay serves
+    const mockId = 'mock:tamper';
+    const mockBeacon = createMockBeacon(
+      { round: 99999, randomness: realRandomness, signature: realSignature },
+      true, // verifyBeacon would pass, but relay-match check should fail first
+      mockId,
+    );
+    registerBeacon(mockId, () => mockBeacon);
+
+    // Build receipt with TAMPERED randomness
+    const commitment = createCommitment({
+      rule: JSON.stringify({ type: 'uniform', pick: 1 }),
+      inputs: ['alice', 'bob', 'charlie'],
+      revealAfter: 10,
+      beacon: mockId,
+    });
+
+    const output = deriveOutput(tamperedRandomness, commitment.ruleHash, commitment.inputsHash);
+    const selection = applyRule(commitment.rule, commitment.inputs, output);
+
+    const resolution: Resolution = {
+      beaconRound: commitment.targetRound,
+      beaconSignature: realSignature,      // signature is "real"
+      beaconRandomness: tamperedRandomness, // but randomness is forged
+      verified: true,
+      output,
+      selection,
+    };
+
+    const receipt = createReceipt(commitment, resolution);
+    const result = await verifyReceipt(receipt);
+
+    expect(result.checks.beaconVerified).toBe(false);
+    expect(result.status).toBe('INVALID');
+    expect(result.reason).toContain('does not match fetched round');
+  });
+
+  // ── Test 4: Missing beacon fields — empty string rejected ─────────────────
+  test('[NEG-4] Empty randomness/signature in receipt is INVALID', async () => {
+    const mockId = 'mock:empty-fields';
+    const mockBeacon = createMockBeacon(
+      { round: 99999, randomness: 'aa'.repeat(32), signature: 'bb'.repeat(48) },
+      true,
+      mockId,
+    );
+    registerBeacon(mockId, () => mockBeacon);
+
+    // Build receipt with empty randomness and signature
+    const receipt = makeReceiptForBeacon(mockId, '', '');
+    const result = await verifyReceipt(receipt);
+
+    expect(result.checks.beaconVerified).toBe(false);
+    expect(result.status).toBe('INVALID');
+  });
+
+  // ── Test 5: Mock beacon verifyBeacon() false with matching data ───────────
+  // Simulates the core attack: compromised relay serves matching data,
+  // but BLS verification (independent of relay) correctly rejects it.
+  test('[NEG-5] Mock beacon verifyBeacon():false is INVALID even with relay-matching data', async () => {
+    const mockId = 'mock:bls-fail';
+    const fakeRandomness = 'cd'.repeat(32);
+    const fakeSignature = 'ef'.repeat(48);
+    const mockBeacon = createMockBeacon(
+      { round: 99999, randomness: fakeRandomness, signature: fakeSignature },
+      false, // BLS fails — this is the critical check
+      mockId,
+    );
+    registerBeacon(mockId, () => mockBeacon);
+
+    // Receipt is consistent with what the mock relay returns
+    const receipt = makeReceiptForBeacon(mockId, fakeRandomness, fakeSignature);
+    const result = await verifyReceipt(receipt);
+
+    // Relay match passes but BLS must fail — fail-closed
+    expect(result.checks.beaconVerified).toBe(false);
+    expect(result.status).toBe('INVALID');
+    expect(result.reason).toMatch(/BLS|bls|fail-closed|forgery|cryptographic/i);
+  });
+
+  // ── Test 6: resolution.verified:true is NOT trusted ────────────────────
+  // The Resolution type has a `verified` field that resolveCommitment() sets.
+  // verifyReceipt() MUST NOT trust this self-reported field.
+  test('[NEG-6] resolution.verified:true on offline receipt does NOT bypass beacon check', async () => {
+    const commitment = createCommitment({
+      rule: JSON.stringify({ type: 'uniform', pick: 1 }),
+      inputs: ['alice', 'bob'],
+      revealAfter: 10,
+      beacon: 'offline',
+    });
+
+    const offlineRandomness = sha256(`offline-beacon:${commitment.targetRound}`);
+    const offlineSignature = sha256(`offline-sig:${commitment.targetRound}`);
+    const output = deriveOutput(offlineRandomness, commitment.ruleHash, commitment.inputsHash);
+    const selection = applyRule(commitment.rule, commitment.inputs, output);
+
+    const resolution: Resolution = {
+      beaconRound: commitment.targetRound,
+      beaconSignature: offlineSignature,
+      beaconRandomness: offlineRandomness,
+      verified: true, // attacker or issuer claims verified — must be ignored
+      output,
+      selection,
+    };
+
+    const receipt = createReceipt(commitment, resolution);
+    const result = await verifyReceipt(receipt);
+
+    // Self-reported verified:true must not propagate to checks.beaconVerified
+    expect(result.checks.beaconVerified).toBe(false);
+    expect(result.status).toBe('INVALID');
+  });
+
+  // ── Test 7: Positive control — mock beacon with verifyBeacon():true ────────
+  // Ensures the fix does not over-block: a valid mock beacon should still
+  // allow beaconVerified:true when BLS succeeds.
+  test('[POS-7] Mock beacon with verifyBeacon():true and matching data gives beaconVerified:true', async () => {
+    const mockId = 'mock:bls-pass';
+    const goodRandomness = '12'.repeat(32);
+    const goodSignature = '34'.repeat(48);
+    const mockBeacon = createMockBeacon(
+      { round: 99999, randomness: goodRandomness, signature: goodSignature },
+      true, // BLS passes
+      mockId,
+    );
+    registerBeacon(mockId, () => mockBeacon);
+
+    const receipt = makeReceiptForBeacon(mockId, goodRandomness, goodSignature);
+    const result = await verifyReceipt(receipt);
+
+    // BLS passes — beaconVerified should be true
+    expect(result.checks.beaconVerified).toBe(true);
+    // Other checks may vary; at minimum commitmentIntegrity + outputVerified + selectionVerified
+    expect(result.checks.commitmentIntegrity).toBe(true);
+    expect(result.checks.outputVerified).toBe(true);
+    // Status: PARTIAL (precedence unattested) or VALID if precedence satisfied
+    expect(['VALID', 'PARTIAL']).toContain(result.status);
   });
 });

@@ -167,16 +167,58 @@ export async function verifyReceipt(
   }
 
   // ─── Check 3: Beacon Verification ────────────────────────
+  //
+  // P0 fix (Batch 2): this check previously only compared relay-fetched data
+  // against the receipt — it never called beacon.verifyBeacon(), so any receipt
+  // whose stored signature happened to match the relay response would receive
+  // beaconVerified:true without BLS12-381 cryptographic verification.
+  //
+  // Attack vectors closed by this fix:
+  //   A) Offline beacon — sha256 "signatures" are not BLS; must be rejected.
+  //   B) Compromised relay — relay can serve any {randomness, signature} pair;
+  //      BLS verification catches forged signatures independent of the relay.
+  //   C) Crafted receipts with zero/garbage signatures that coincidentally match
+  //      a relay response (possible if relay is also compromised).
+  //
+  // Fail-closed semantics: if BLS verification cannot be confirmed, beaconVerified
+  // stays false.  "Unverifiable" must never be reported as "verified".
   if (resolution) {
     try {
       const beacon = getBeaconSource(commitment.beacon);
-      const beaconRound = await beacon.fetchBeacon(commitment.targetRound);
 
-      if (beaconRound.randomness === resolution.beaconRandomness &&
-          beaconRound.signature === resolution.beaconSignature) {
-        checks.beaconVerified = true;
+      // ── A) Offline beacon: deterministic sha256 "signatures", NOT BLS. ──────
+      // Offline mode is for demos / firewalled environments only.
+      // A verifier MUST NOT report beaconVerified:true for non-BLS signatures.
+      if (commitment.beacon === 'offline') {
+        reasons.push(
+          'Offline beacon used — no BLS signature present. ' +
+          'Offline mode produces deterministic sha256 outputs, not drand BLS12-381 signatures. ' +
+          'Offline receipts cannot be cryptographically attested; do not use in audit contexts.'
+        );
+        // beaconVerified stays false — fail-closed
       } else {
-        reasons.push('Beacon randomness/signature does not match fetched round');
+        // ── B+C) Real beacon: first check relay data, then verify BLS. ──────────
+        const beaconRound = await beacon.fetchBeacon(commitment.targetRound);
+
+        if (beaconRound.randomness !== resolution.beaconRandomness ||
+            beaconRound.signature !== resolution.beaconSignature) {
+          reasons.push('Beacon randomness/signature does not match fetched round');
+        } else {
+          // Data matches the relay response — now cryptographically verify the
+          // BLS12-381 signature.  This is the step that was missing (P0 bug):
+          // without it, a compromised relay or crafted receipt could bypass
+          // beacon verification entirely.
+          const blsValid = await beacon.verifyBeacon(beaconRound);
+          if (blsValid) {
+            checks.beaconVerified = true;
+          } else {
+            reasons.push(
+              'Beacon data matches relay response but BLS12-381 signature failed cryptographic verification. ' +
+              'Possible relay compromise, signature forgery, or malformed beacon data. ' +
+              'Fail-closed: beaconVerified set to false.'
+            );
+          }
+        }
       }
     } catch (err) {
       reasons.push(`Beacon verification failed: ${err}`);
