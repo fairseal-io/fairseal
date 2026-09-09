@@ -357,7 +357,222 @@ function createReceipt(commitment, resolution, anchor) {
   };
 }
 
+// src/vdf-verify.ts
+import { createHash as createHash2 } from "crypto";
+var RSA2048_N = 25195908475657893494027183240048398571429282126204032027777137836043662020707595556264018525880784406918290641249515082189298559149176184502808489120072844992687392807287776735971418347270261896375014971824691165077613379859095700097330459748808428401797429100642458691817195118746121515172654632282216869987549182422433637259085141865462043576798423387184774447920739934236584823824281198163815010674810451660377306056201619676256133844143603833904414952634432190114657544454178424020924616515723350778707749817125772467962926386356373289912154831438167899885040445364023527381951378636564391212010397122822120720357n;
+function modpow(base, exp, mod) {
+  if (mod === 1n) return 0n;
+  let result = 1n;
+  base = (base % mod + mod) % mod;
+  while (exp > 0n) {
+    if (exp & 1n) result = result * base % mod;
+    exp >>= 1n;
+    base = base * base % mod;
+  }
+  return result;
+}
+function isPrime(n) {
+  if (n < 2n) return false;
+  if (n < 4n) return true;
+  if (n % 2n === 0n) return false;
+  let d = n - 1n, r = 0;
+  while (d % 2n === 0n) {
+    d >>= 1n;
+    r++;
+  }
+  for (const a of [2n, 3n, 5n, 7n, 11n, 13n, 17n, 19n, 23n, 29n, 31n, 37n]) {
+    if (a >= n) continue;
+    let x = modpow(a, d, n);
+    if (x === 1n || x === n - 1n) continue;
+    let composite = true;
+    for (let i = 0; i < r - 1; i++) {
+      x = x * x % n;
+      if (x === n - 1n) {
+        composite = false;
+        break;
+      }
+    }
+    if (composite) return false;
+  }
+  return true;
+}
+function hashToPrime(x, y, T, N) {
+  const xHex = x.toString(16);
+  const yHex = y.toString(16);
+  const NPrefix = N.toString(16).slice(0, 16);
+  let ctr = 0n;
+  while (true) {
+    const digest = createHash2("sha256").update(`wesolowski:${xHex}:${yHex}:${T}:${NPrefix}:${ctr}`).digest("hex");
+    const candidate = BigInt("0x" + digest.slice(0, 32)) | 1n;
+    if (isPrime(candidate)) return candidate;
+    ctr++;
+  }
+}
+function seedToGroupElement(seed, N = RSA2048_N) {
+  const h = createHash2("sha256").update(seed).digest("hex");
+  return BigInt("0x" + h) % (N - 4n) + 2n;
+}
+function sha2562(input) {
+  return createHash2("sha256").update(input, "utf8").digest("hex");
+}
+function isVDFReceipt(obj) {
+  if (!obj || typeof obj !== "object") return false;
+  const r = obj;
+  return typeof r["commitment_id"] === "string" && typeof r["committed_epoch"] === "number" && typeof r["commitment_time"] === "string";
+}
+function isRevealReceipt(receipt) {
+  return "proof" in receipt && !!receipt.proof?.wesolowski_proof;
+}
+function checkCommitmentHash(receipt) {
+  const preimage = `${receipt.commitment_id}|${receipt.committed_epoch}|${receipt.commitment_time}`;
+  const recomputed = sha2562(preimage);
+  const stored = receipt.commitment_hash || receipt.commitment_hash || receipt.verification?.commitment_hash;
+  if (!stored) {
+    return {
+      ok: false,
+      reason: `No commitment_hash field found (checked top-level and verification.commitment_hash). Recomputed value: ${recomputed}. Cannot confirm integrity without a stored hash.`
+    };
+  }
+  if (recomputed === stored) return { ok: true };
+  return {
+    ok: false,
+    reason: `Commitment hash mismatch: SHA256("${preimage}") = ${recomputed}, stored = ${stored}`
+  };
+}
+function checkTemporalValidity(receipt) {
+  const epochAtCommit = "current_epoch_at_commit" in receipt ? receipt.current_epoch_at_commit : receipt.current_epoch;
+  if (typeof epochAtCommit !== "number") {
+    return { ok: false, reason: "Missing current_epoch / current_epoch_at_commit field" };
+  }
+  if (receipt.committed_epoch > epochAtCommit) return { ok: true };
+  return {
+    ok: false,
+    reason: `Temporal check failed: committed_epoch (${receipt.committed_epoch}) must be > epoch_at_commit (${epochAtCommit})`
+  };
+}
+function checkValueDerivation(receipt) {
+  const { y } = receipt.proof.wesolowski_proof;
+  const expected = sha2562(`wesolowski-y|${y}`);
+  if (expected === receipt.value) return { ok: true };
+  return {
+    ok: false,
+    reason: `Value derivation mismatch: SHA256("wesolowski-y|"+y) = ${expected}, got ${receipt.value}`
+  };
+}
+function checkSeedToX(proof, N) {
+  const { seed, x } = proof.wesolowski_proof;
+  try {
+    const expectedX = seedToGroupElement(seed, N);
+    const actualX = BigInt("0x" + x);
+    if (expectedX === actualX) return { ok: true };
+    return {
+      ok: false,
+      reason: `Seed \u2192 x mapping failed: seedToGroupElement("${seed}") produced 0x${expectedX.toString(16).slice(0, 16)}... but receipt has x = ${x}. Formula: (SHA256(seed) mod (N-4)) + 2`
+    };
+  } catch (err) {
+    return { ok: false, reason: `Seed \u2192 x check error: ${err}` };
+  }
+}
+function checkWesolowskiMath(proof, N) {
+  try {
+    const xB = BigInt("0x" + proof.x);
+    const yB = BigInt("0x" + proof.y);
+    const piB = BigInt("0x" + proof.pi);
+    if (xB === 0n) return { ok: false, reason: "VDF input x is zero \u2014 invalid group element" };
+    if (yB === 0n) return { ok: false, reason: "VDF output y is zero \u2014 invalid group element" };
+    if (piB === 0n) return { ok: false, reason: "VDF proof \u03C0 is zero \u2014 invalid proof element" };
+    const l = hashToPrime(xB, yB, proof.T, N);
+    const r = modpow(2n, BigInt(proof.T), l);
+    const lhs = modpow(piB, l, N) * modpow(xB % N, r, N) % N;
+    const rhs = yB % N;
+    if (lhs === rhs) return { ok: true };
+    return {
+      ok: false,
+      reason: `Wesolowski verification failed: \u03C0^\u2113 \xB7 x^r \u2262 y (mod N). The VDF output cannot be confirmed as correct. lhs (first 16 hex) = ${lhs.toString(16).slice(0, 16)}, rhs = ${rhs.toString(16).slice(0, 16)}`
+    };
+  } catch (err) {
+    return { ok: false, reason: `Wesolowski math check error: ${err}` };
+  }
+}
+async function verifyVDFReceipt(receipt, options) {
+  const N = options?.N ?? RSA2048_N;
+  const skipMath = options?.skipMath ?? false;
+  const checks = {
+    commitmentHashVerified: false,
+    temporalValid: false,
+    valueDerivationVerified: false,
+    seedToXVerified: false,
+    wesolowskiMathVerified: false
+  };
+  const reasons = [];
+  if (!receipt || typeof receipt !== "object") {
+    return {
+      status: "UNVERIFIABLE",
+      checks,
+      reason: "Receipt is null or not an object"
+    };
+  }
+  const c1 = checkCommitmentHash(receipt);
+  checks.commitmentHashVerified = c1.ok;
+  if (!c1.ok && c1.reason) reasons.push(c1.reason);
+  const c2 = checkTemporalValidity(receipt);
+  checks.temporalValid = c2.ok;
+  if (!c2.ok && c2.reason) reasons.push(c2.reason);
+  if (isRevealReceipt(receipt)) {
+    const wp = receipt.proof.wesolowski_proof;
+    const c3 = checkValueDerivation(receipt);
+    checks.valueDerivationVerified = c3.ok;
+    if (!c3.ok && c3.reason) reasons.push(c3.reason);
+    const c4 = checkSeedToX(receipt.proof, N);
+    checks.seedToXVerified = c4.ok;
+    if (!c4.ok && c4.reason) reasons.push(c4.reason);
+    if (!skipMath) {
+      const c5 = checkWesolowskiMath(wp, N);
+      checks.wesolowskiMathVerified = c5.ok;
+      if (!c5.ok && c5.reason) reasons.push(c5.reason);
+    } else {
+      reasons.push(
+        "Wesolowski math verification skipped (skipMath: true). Hash-chain integrity verified only; VDF soundness (T squarings) is NOT confirmed."
+      );
+    }
+  }
+  let status;
+  if (!checks.commitmentHashVerified || !checks.temporalValid) {
+    status = "INVALID";
+  } else if (!isRevealReceipt(receipt)) {
+    status = "PARTIAL";
+  } else {
+    const hashesOk = checks.valueDerivationVerified && checks.seedToXVerified;
+    if (hashesOk && checks.wesolowskiMathVerified) {
+      status = "VALID";
+    } else if (hashesOk && skipMath) {
+      status = "PARTIAL";
+    } else {
+      status = "INVALID";
+    }
+  }
+  return {
+    status,
+    checks,
+    reason: reasons.length > 0 ? reasons.join("; ") : void 0
+  };
+}
+
 // src/verify.ts
+function mapVDFResult(vdf) {
+  const status = vdf.status === "UNVERIFIABLE" ? "INVALID" : vdf.status;
+  return {
+    status,
+    checks: {
+      commitmentIntegrity: vdf.checks.commitmentHashVerified,
+      precedenceVerified: vdf.checks.temporalValid,
+      beaconVerified: vdf.checks.wesolowskiMathVerified,
+      outputVerified: vdf.checks.valueDerivationVerified,
+      selectionVerified: false
+    },
+    reason: vdf.reason
+  };
+}
 function validateAnchorStructure(anchor) {
   if (!anchor.txHash || typeof anchor.txHash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(anchor.txHash)) {
     return "Invalid txHash format (expected 0x-prefixed 32-byte hex)";
@@ -374,6 +589,10 @@ function validateAnchorStructure(anchor) {
   return null;
 }
 async function verifyReceipt(receipt, options) {
+  if (isVDFReceipt(receipt)) {
+    const vdfResult = await verifyVDFReceipt(receipt);
+    return mapVDFResult(vdfResult);
+  }
   const checks = {
     commitmentIntegrity: false,
     precedenceVerified: false,
@@ -532,6 +751,7 @@ export {
   DRAND_QUICKNET,
   DrandBeaconSource,
   OfflineBeaconSource,
+  RSA2048_N,
   applyRule,
   computeCommitHash,
   createCommitment,
@@ -542,11 +762,13 @@ export {
   getBeaconSource,
   hashInputs,
   hashRule,
+  isVDFReceipt,
   registerBeacon,
   resolveCommitment,
   sha256,
   toHex,
   validateRule,
   verifyReceipt,
+  verifyVDFReceipt,
   waitAndResolve
 };
