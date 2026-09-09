@@ -167,6 +167,18 @@ declare function createCommitment(opts: CommitmentOptions): Commitment;
  */
 
 /**
+ * Options for {@link resolveCommitment}.
+ */
+interface ResolveOptions {
+    /**
+     * If true, wait (poll) until the target beacon round becomes available
+     * instead of throwing. Bounded by `maxWaitMs`.
+     */
+    wait?: boolean;
+    /** Maximum total milliseconds to wait when `wait` is true. Default: 15000. */
+    maxWaitMs?: number;
+}
+/**
  * Resolve a commitment after its target beacon round has elapsed.
  *
  * Fetches the beacon output, verifies the BLS signature, derives
@@ -182,7 +194,19 @@ declare function createCommitment(opts: CommitmentOptions): Commitment;
  * console.log(resolution.verified);  // true
  * ```
  */
-declare function resolveCommitment(commitment: Commitment): Promise<Resolution>;
+declare function resolveCommitment(commitment: Commitment, opts?: ResolveOptions): Promise<Resolution>;
+/**
+ * Convenience wrapper: resolve a commitment, waiting for the target beacon
+ * round to become available (polls, bounded by `maxWaitMs`, default 15s).
+ *
+ * Equivalent to `resolveCommitment(commitment, { wait: true, ...opts })`.
+ *
+ * @example
+ * ```typescript
+ * const resolution = await waitAndResolve(commitment); // no manual sleep needed
+ * ```
+ */
+declare function waitAndResolve(commitment: Commitment, opts?: Omit<ResolveOptions, 'wait'>): Promise<Resolution>;
 /**
  * Create a complete receipt from a commitment, optional anchor, and resolution.
  */
@@ -213,6 +237,12 @@ declare function createReceipt(commitment: Commitment, resolution: Resolution, a
  * Returns VALID if all checks pass, PARTIAL if some pass (e.g. unattested
  * precedence), INVALID if any critical check fails.
  *
+ * **Security note:** Receipts claiming `precedence: 'onchain'` are INVALID
+ * by default unless a `verifyAnchor` callback is provided and succeeds.
+ * Self-reported anchor data is never trusted without on-chain verification.
+ * Set `strictAnchor: false` to explicitly opt into accepting unverified
+ * on-chain claims (NOT recommended for audit/compliance use cases).
+ *
  * @example
  * ```typescript
  * const result = await verifyReceipt(receipt);
@@ -221,7 +251,19 @@ declare function createReceipt(commitment: Commitment, resolution: Resolution, a
  * }
  * ```
  */
-declare function verifyReceipt(receipt: CSReceipt): Promise<VerificationResult>;
+declare function verifyReceipt(receipt: CSReceipt, options?: {
+    /** Optional callback for on-chain anchor verification */
+    verifyAnchor?: (anchor: AnchorProof, commitHash: string) => Promise<boolean>;
+    /**
+     * When true (default), receipts claiming on-chain precedence are INVALID
+     * unless verifyAnchor callback is provided and succeeds. Self-reported
+     * anchor data is never trusted without independent verification.
+     *
+     * Set to false ONLY when anchor verification is handled externally
+     * and you accept the security implications.
+     */
+    strictAnchor?: boolean;
+}): Promise<VerificationResult>;
 
 /**
  * @fairseal/commit — Beacon sources
@@ -380,4 +422,4 @@ declare function fromHex(hex: string): Uint8Array;
  */
 declare function deriveOutput(beaconRandomness: string, ruleHash: string, inputsHash: string): string;
 
-export { type AnchorProof, type BeaconConfig, type BeaconRound, type BeaconSource, type CSReceipt, CachedBeaconSource, type Commitment, type CommitmentOptions, DRAND_QUICKNET, DrandBeaconSource, OfflineBeaconSource, type PrecedenceType, type Resolution, type VerificationResult, type VerificationStatus, applyRule, computeCommitHash, createCommitment, createDefaultBeacon, createReceipt, deriveOutput, fromHex, getBeaconSource, hashInputs, hashRule, registerBeacon, resolveCommitment, sha256, toHex, validateRule, verifyReceipt };
+export { type AnchorProof, type BeaconConfig, type BeaconRound, type BeaconSource, type CSReceipt, CachedBeaconSource, type Commitment, type CommitmentOptions, DRAND_QUICKNET, DrandBeaconSource, OfflineBeaconSource, type PrecedenceType, type Resolution, type ResolveOptions, type VerificationResult, type VerificationStatus, applyRule, computeCommitHash, createCommitment, createDefaultBeacon, createReceipt, deriveOutput, fromHex, getBeaconSource, hashInputs, hashRule, registerBeacon, resolveCommitment, sha256, toHex, validateRule, verifyReceipt, waitAndResolve };

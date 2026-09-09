@@ -154,7 +154,8 @@ __export(index_exports, {
   sha256: () => sha256,
   toHex: () => toHex,
   validateRule: () => validateRule,
-  verifyReceipt: () => verifyReceipt
+  verifyReceipt: () => verifyReceipt,
+  waitAndResolve: () => waitAndResolve
 });
 module.exports = __toCommonJS(index_exports);
 
@@ -436,24 +437,43 @@ function createCommitment(opts) {
 }
 
 // src/resolve.ts
-async function resolveCommitment(commitment) {
+var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function resolveCommitment(commitment, opts = {}) {
   const beacon = getBeaconSource(commitment.beacon);
+  const maxWaitMs = opts.maxWaitMs ?? 15e3;
+  const deadline = Date.now() + maxWaitMs;
   const roundTime = beacon.getRoundTime(commitment.targetRound);
   const now = Math.floor(Date.now() / 1e3);
   if (now < roundTime) {
     const waitSeconds = roundTime - now;
-    throw new Error(
-      `Target round ${commitment.targetRound} hasn't elapsed yet. Available at ${new Date(roundTime * 1e3).toISOString()} (${waitSeconds}s from now)`
-    );
+    if (!opts.wait) {
+      throw new Error(
+        `Target round ${commitment.targetRound} hasn't elapsed yet. Available at ${new Date(roundTime * 1e3).toISOString()} (${waitSeconds}s from now). Tip: pass { wait: true } (or use waitAndResolve) to wait automatically.`
+      );
+    }
+    const waitMs = (roundTime - now) * 1e3 + 500;
+    if (Date.now() + waitMs > deadline) {
+      throw new Error(
+        `Target round ${commitment.targetRound} is ${waitSeconds}s away, which exceeds maxWaitMs=${maxWaitMs}. Increase maxWaitMs or resolve later.`
+      );
+    }
+    await sleep(waitMs);
   }
   let beaconRound;
-  try {
-    beaconRound = await beacon.fetchBeacon(commitment.targetRound);
-  } catch (err) {
-    const msg = err instanceof AggregateError ? err.message : err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `Beacon fetch failed: ${msg}. For offline demos, use beaconId: 'offline' in CommitmentOptions.`
-    );
+  for (; ; ) {
+    try {
+      beaconRound = await beacon.fetchBeacon(commitment.targetRound);
+      break;
+    } catch (err) {
+      if (opts.wait && Date.now() + 1e3 < deadline) {
+        await sleep(1e3);
+        continue;
+      }
+      const msg = err instanceof AggregateError ? err.message : err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Beacon fetch failed: ${msg}. For offline demos, use beaconId: 'offline' in CommitmentOptions.`
+      );
+    }
   }
   const verified = await beacon.verifyBeacon(beaconRound);
   const output = deriveOutput(
@@ -479,6 +499,9 @@ async function resolveCommitment(commitment) {
     selection
   };
 }
+async function waitAndResolve(commitment, opts = {}) {
+  return resolveCommitment(commitment, { ...opts, wait: true });
+}
 function createReceipt(commitment, resolution, anchor) {
   return {
     version: "1.0.0",
@@ -491,7 +514,22 @@ function createReceipt(commitment, resolution, anchor) {
 }
 
 // src/verify.ts
-async function verifyReceipt(receipt) {
+function validateAnchorStructure(anchor) {
+  if (!anchor.txHash || typeof anchor.txHash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(anchor.txHash)) {
+    return "Invalid txHash format (expected 0x-prefixed 32-byte hex)";
+  }
+  if (typeof anchor.blockNumber !== "number" || !Number.isInteger(anchor.blockNumber) || anchor.blockNumber <= 0) {
+    return "Invalid blockNumber (expected positive integer)";
+  }
+  if (typeof anchor.blockTimestamp !== "number" || anchor.blockTimestamp <= 0) {
+    return "Invalid blockTimestamp (expected positive Unix timestamp)";
+  }
+  if (typeof anchor.chainId !== "number" || !Number.isInteger(anchor.chainId) || anchor.chainId <= 0) {
+    return "Invalid chainId (expected positive integer)";
+  }
+  return null;
+}
+async function verifyReceipt(receipt, options) {
   const checks = {
     commitmentIntegrity: false,
     precedenceVerified: false,
@@ -500,6 +538,7 @@ async function verifyReceipt(receipt) {
     selectionVerified: false
   };
   const reasons = [];
+  let anchorClaimUnverified = false;
   const { commitment, anchor, resolution } = receipt;
   try {
     const recomputedRuleHash = hashRule(commitment.rule);
@@ -525,19 +564,43 @@ async function verifyReceipt(receipt) {
   } catch (err) {
     reasons.push(`Commitment integrity check failed: ${err}`);
   }
+  const strictAnchor = options?.strictAnchor !== false;
   if (anchor && receipt.precedence === "onchain") {
-    try {
-      const beacon = getBeaconSource(commitment.beacon);
-      const roundTime = beacon.getRoundTime(commitment.targetRound);
-      if (anchor.blockTimestamp < roundTime) {
-        checks.precedenceVerified = true;
+    const structError = validateAnchorStructure(anchor);
+    if (structError) {
+      anchorClaimUnverified = true;
+      reasons.push(`Anchor proof structurally invalid: ${structError}`);
+    } else if (options?.verifyAnchor) {
+      try {
+        const anchorValid = await options.verifyAnchor(anchor, commitment.commitHash);
+        if (anchorValid) {
+          const beacon = getBeaconSource(commitment.beacon);
+          const roundTime = beacon.getRoundTime(commitment.targetRound);
+          if (anchor.blockTimestamp < roundTime) {
+            checks.precedenceVerified = true;
+          } else {
+            reasons.push("Anchor timestamp does not precede target round time");
+          }
+        } else {
+          anchorClaimUnverified = true;
+          reasons.push("Anchor proof rejected by verifyAnchor callback");
+        }
+      } catch (err) {
+        anchorClaimUnverified = true;
+        reasons.push(`Anchor verification failed: ${err}`);
+      }
+    } else {
+      anchorClaimUnverified = true;
+      if (strictAnchor) {
+        reasons.push(
+          "Receipt claims on-chain precedence but no verifyAnchor callback provided. Self-reported anchor data cannot be trusted without independent on-chain verification. Pass a verifyAnchor callback, or set strictAnchor: false to accept unverified claims (not recommended)."
+        );
       } else {
         reasons.push(
-          `Anchor timestamp (${anchor.blockTimestamp}) does not precede target round time (${roundTime})`
+          "Anchor proof present but not independently verified (strictAnchor: false). Self-reported anchor data accepted without on-chain verification \u2014 NOT suitable for audit/compliance."
         );
+        anchorClaimUnverified = false;
       }
-    } catch (err) {
-      reasons.push(`Precedence check failed: ${err}`);
     }
   } else if (receipt.precedence === "unattested") {
     reasons.push("Precedence is unattested \u2014 commitment timing cannot be independently verified");
@@ -545,11 +608,24 @@ async function verifyReceipt(receipt) {
   if (resolution) {
     try {
       const beacon = getBeaconSource(commitment.beacon);
-      const beaconRound = await beacon.fetchBeacon(commitment.targetRound);
-      if (beaconRound.randomness === resolution.beaconRandomness && beaconRound.signature === resolution.beaconSignature) {
-        checks.beaconVerified = true;
+      if (commitment.beacon === "offline") {
+        reasons.push(
+          "Offline beacon used \u2014 no BLS signature present. Offline mode produces deterministic sha256 outputs, not drand BLS12-381 signatures. Offline receipts cannot be cryptographically attested; do not use in audit contexts."
+        );
       } else {
-        reasons.push("Beacon randomness/signature does not match fetched round");
+        const beaconRound = await beacon.fetchBeacon(commitment.targetRound);
+        if (beaconRound.randomness !== resolution.beaconRandomness || beaconRound.signature !== resolution.beaconSignature) {
+          reasons.push("Beacon randomness/signature does not match fetched round");
+        } else {
+          const blsValid = await beacon.verifyBeacon(beaconRound);
+          if (blsValid) {
+            checks.beaconVerified = true;
+          } else {
+            reasons.push(
+              "Beacon data matches relay response but BLS12-381 signature failed cryptographic verification. Possible relay compromise, signature forgery, or malformed beacon data. Fail-closed: beaconVerified set to false."
+            );
+          }
+        }
       }
     } catch (err) {
       reasons.push(`Beacon verification failed: ${err}`);
@@ -583,10 +659,8 @@ async function verifyReceipt(receipt) {
           reasons.push("Selection does not match rule application to output");
         }
       } else {
-        checks.selectionVerified = resolution.selection !== null;
-        if (!checks.selectionVerified) {
-          reasons.push("Custom rule \u2014 selection verification requires operator algorithm");
-        }
+        checks.selectionVerified = false;
+        reasons.push("Custom rule \u2014 selection verification requires operator-provided verification function");
       }
     } catch (err) {
       reasons.push(`Selection verification failed: ${err}`);
@@ -594,7 +668,9 @@ async function verifyReceipt(receipt) {
   }
   let status;
   const coreChecks = checks.commitmentIntegrity && checks.beaconVerified && checks.outputVerified;
-  if (coreChecks && checks.selectionVerified) {
+  if (anchorClaimUnverified) {
+    status = "INVALID";
+  } else if (coreChecks && checks.selectionVerified) {
     status = checks.precedenceVerified ? "VALID" : "PARTIAL";
   } else if (coreChecks && !checks.selectionVerified) {
     status = "PARTIAL";
@@ -631,5 +707,6 @@ init_rules();
   sha256,
   toHex,
   validateRule,
-  verifyReceipt
+  verifyReceipt,
+  waitAndResolve
 });
