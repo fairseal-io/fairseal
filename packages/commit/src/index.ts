@@ -43,6 +43,19 @@ export { resolveCommitment, waitAndResolve, createReceipt } from './resolve.js';
 export type { ResolveOptions } from './resolve.js';
 export { verifyReceipt } from './verify.js';
 
+// VDF receipt verification (FairSeal API /v1/rng/* endpoints)
+export { verifyVDFReceipt, isVDFReceipt, RSA2048_N } from './vdf-verify.js';
+export type {
+  WesolowskiProof,
+  VDFProof,
+  VDFVerificationHints,
+  VDFCommitReceipt,
+  VDFRevealReceipt,
+  AnyVDFReceipt,
+  VDFVerificationChecks,
+  VDFVerificationResult,
+} from './vdf-verify.js';
+
 // Beacon sources
 export {
   DrandBeaconSource,

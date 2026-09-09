@@ -1,13 +1,54 @@
 /**
  * @fairseal/commit — Receipt verification
- * 
- * Verify a complete CSReceipt from scratch — no trust in the issuer.
+ *
+ * Verify a complete CSReceipt (drand-based) from scratch — no trust in the issuer.
  * Every check is independently reproducible.
+ *
+ * VDF receipt dispatch:
+ * This file also handles FairSeal API VDF receipts (from /v1/rng/commit and
+ * /v1/rng/reveal) at runtime.  When verifyReceipt() receives an object that
+ * passes the isVDFReceipt() type guard it dispatches to verifyVDFReceipt()
+ * and maps the result back to VerificationResult for API consistency.
+ *
+ * TypeScript users who hold a typed VDFRevealReceipt or VDFCommitReceipt are
+ * encouraged to call verifyVDFReceipt() directly for the richer result type.
  */
 
 import type { AnchorProof, CSReceipt, VerificationResult, VerificationStatus } from './types.js';
 import { getBeaconSource } from './beacon.js';
 import { computeCommitHash, deriveOutput, hashInputs, hashRule } from './crypto.js';
+import { isVDFReceipt, verifyVDFReceipt, type VDFVerificationResult } from './vdf-verify.js';
+
+// ─── VDF Dispatch Helpers ─────────────────────────────────────────────────────
+
+/**
+ * Map a VDFVerificationResult to the standard VerificationResult shape.
+ *
+ * Mapping rationale:
+ *   commitmentIntegrity  ← commitmentHashVerified  (both are integrity anchors)
+ *   precedenceVerified   ← temporalValid            (timing guarantee)
+ *   beaconVerified       ← wesolowskiMathVerified   (entropy source soundness)
+ *   outputVerified       ← valueDerivationVerified  (derived random output)
+ *   selectionVerified    ← false (N/A: VDF receipts don't carry a selection rule)
+ *
+ * Status UNVERIFIABLE is mapped to INVALID (fail-closed: if we cannot verify,
+ * we must not return a positive signal).
+ */
+function mapVDFResult(vdf: VDFVerificationResult): VerificationResult {
+  const status: VerificationStatus =
+    vdf.status === 'UNVERIFIABLE' ? 'INVALID' : vdf.status;
+  return {
+    status,
+    checks: {
+      commitmentIntegrity: vdf.checks.commitmentHashVerified,
+      precedenceVerified: vdf.checks.temporalValid,
+      beaconVerified: vdf.checks.wesolowskiMathVerified,
+      outputVerified: vdf.checks.valueDerivationVerified,
+      selectionVerified: false,
+    },
+    reason: vdf.reason,
+  };
+}
 
 /**
  * Structural validation of an AnchorProof.
@@ -65,13 +106,24 @@ export async function verifyReceipt(
      * When true (default), receipts claiming on-chain precedence are INVALID
      * unless verifyAnchor callback is provided and succeeds. Self-reported
      * anchor data is never trusted without independent verification.
-     * 
+     *
      * Set to false ONLY when anchor verification is handled externally
      * and you accept the security implications.
      */
     strictAnchor?: boolean;
   }
 ): Promise<VerificationResult> {
+  // ─── VDF format detection (runtime dispatch) ────────────────────────────────────
+  // If the caller passes a FairSeal VDF receipt instead of a CSReceipt,
+  // dispatch to verifyVDFReceipt() and map the result to VerificationResult.
+  // TypeScript callers who hold a typed VDFRevealReceipt should call
+  // verifyVDFReceipt() directly for the richer VDFVerificationResult type.
+  if (isVDFReceipt(receipt as unknown)) {
+    const vdfResult = await verifyVDFReceipt(receipt as unknown as Parameters<typeof verifyVDFReceipt>[0]);
+    return mapVDFResult(vdfResult);
+  }
+  // ───────────────────────────────────────────────────────────────────
+
   const checks = {
     commitmentIntegrity: false,
     precedenceVerified: false,
