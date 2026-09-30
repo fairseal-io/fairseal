@@ -1,0 +1,201 @@
+FairSeal R62-P2b — receipt-recipient acceptance run
+Date: Tue Sep 29 16:28:27 CST 2026
+Node: v26.5.1
+Package: @fairseal/verify loaded
+@fairseal/verify 0.4.1
+Directory: /Users/minicoopermilo/.openclaw/workspace/fairseal-examples/receipt-recipient
+
+══════════════════════════════════════════════════════════════════
+ACCEPTANCE TEST 1: Real receipt — all 3 checks must PASS
+══════════════════════════════════════════════════════════════════
+Command: node verify-receipt.mjs fixtures/receipt-real.json
+----------------------------------------------------------------------
+
+═══════════════════════════════════════════════════════════
+ FairSeal Receipt Verification
+═══════════════════════════════════════════════════════════
+ Receipt ID : nr_04d7de00519cbf2b86ffa2e911ac01d8
+ Status     : anchored
+ Agent ID   : compliance-agent-v2
+ Decided At : 2026-09-11T04:03:20.351Z
+═══════════════════════════════════════════════════════════
+
+[1] Leaf recompute (node:crypto — independent of server)
+    formula    : SHA256("nr_04d7de00519cbf2b86ffa2e911ac01d8" + "||" + "<payload_hash>")
+    expected   : 52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859
+    computed   : 52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859
+    result     : ✅ PASS — payload_hash is committed
+
+[2] Merkle path (@fairseal/verify verifyMerklePath + pair-sorted fallback)
+    path length: 0
+    detail     : single-leaf batch: recomputed leaf must equal merkle_root
+    merkle_root: 52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859
+    result     : ✅ PASS — leaf is in committed tree
+
+[3] On-chain anchor (@fairseal/verify verifyAnchor — Base mainnet)
+    contract   : 0xEE09671Bbc6B932BF1461CAff360bfDD9bEA55ca
+    batch_id   : fairseal-notary-batch-1789099451722-3
+    anchor_tx  : 0x9f85ade9c5fda16e32c3b1ecc9789e015b162b21bcad3af05c0ca87057472211 (block 51155054)
+    RPC        : public Base mainnet (https://mainnet.base.org)
+    result     : ✅ PASS — merkle_root confirmed on Base mainnet
+
+═══════════════════════════════════════════════════════════
+ ✅  VERIFIED
+
+    This receipt independently confirms that the payload_hash
+    committed by compliance-agent-v2 at
+    2026-09-11T04:03:20.351Z was
+    anchored on Base mainnet (tx 0x9f85ade9c5fda16e…)
+    and has not been tampered with.
+═══════════════════════════════════════════════════════════
+
+Exit code: 0
+
+══════════════════════════════════════════════════════════════════
+ACCEPTANCE TEST 2: Tampered receipt — must FAIL-CLOSED (exit 1)
+Tamper: payload_hash last 2 chars changed (f14→f99) — proof intact
+══════════════════════════════════════════════════════════════════
+Command: node verify-receipt.mjs fixtures/receipt-tampered.json
+----------------------------------------------------------------------
+
+═══════════════════════════════════════════════════════════
+ FairSeal Receipt Verification
+═══════════════════════════════════════════════════════════
+ Receipt ID : nr_04d7de00519cbf2b86ffa2e911ac01d8
+ Status     : anchored
+ Agent ID   : compliance-agent-v2
+ Decided At : 2026-09-11T04:03:20.351Z
+═══════════════════════════════════════════════════════════
+
+[1] Leaf recompute (node:crypto — independent of server)
+    formula    : SHA256("nr_04d7de00519cbf2b86ffa2e911ac01d8" + "||" + "<payload_hash>")
+    expected   : 52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859
+    computed   : fcb4c788eab2fc8d7413411d2b47102ffc693c976e7286e1ecc7f5ccf24e974e
+    result     : ❌ FAIL — payload_hash mismatch (receipt may be forged)
+
+[2] Merkle path (@fairseal/verify verifyMerklePath + pair-sorted fallback)
+    path length: 0
+    detail     : single-leaf batch: recomputed leaf must equal merkle_root
+    merkle_root: 52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859
+    result     : ❌ FAIL — leaf not in tree (receipt may be forged)
+
+[3] On-chain anchor (@fairseal/verify verifyAnchor — Base mainnet)
+    contract   : 0xEE09671Bbc6B932BF1461CAff360bfDD9bEA55ca
+    batch_id   : fairseal-notary-batch-1789099451722-3
+    anchor_tx  : 0x9f85ade9c5fda16e32c3b1ecc9789e015b162b21bcad3af05c0ca87057472211 (block 51155054)
+    RPC        : public Base mainnet (https://mainnet.base.org)
+    result     : ✅ PASS — merkle_root confirmed on Base mainnet
+
+═══════════════════════════════════════════════════════════
+ ❌  VERIFICATION FAILED
+
+    • payload_hash does not match the committed leaf
+    • merkle path does not resolve to the claimed root
+
+    This receipt should be treated as invalid.
+═══════════════════════════════════════════════════════════
+
+Exit code: 1
+
+══════════════════════════════════════════════════════════════════
+ACCEPTANCE TEST 3: Clean-directory npm install + README steps
+══════════════════════════════════════════════════════════════════
+Command: (fresh /tmp/receipt-recipient-test with only package.json + source)
+npm install output:
+13 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+--- Verify real (clean dir) ---
+
+═══════════════════════════════════════════════════════════
+ FairSeal Receipt Verification
+═══════════════════════════════════════════════════════════
+ Receipt ID : nr_04d7de00519cbf2b86ffa2e911ac01d8
+ Status     : anchored
+ Agent ID   : compliance-agent-v2
+ Decided At : 2026-09-11T04:03:20.351Z
+═══════════════════════════════════════════════════════════
+
+[1] Leaf recompute (node:crypto — independent of server)
+    formula    : SHA256("nr_04d7de00519cbf2b86ffa2e911ac01d8" + "||" + "<payload_hash>")
+    expected   : 52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859
+    computed   : 52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859
+    result     : ✅ PASS — payload_hash is committed
+
+[2] Merkle path (@fairseal/verify verifyMerklePath + pair-sorted fallback)
+    path length: 0
+    detail     : single-leaf batch: recomputed leaf must equal merkle_root
+    merkle_root: 52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859
+    result     : ✅ PASS — leaf is in committed tree
+
+[3] On-chain anchor (@fairseal/verify verifyAnchor — Base mainnet)
+    contract   : 0xEE09671Bbc6B932BF1461CAff360bfDD9bEA55ca
+    batch_id   : fairseal-notary-batch-1789099451722-3
+    anchor_tx  : 0x9f85ade9c5fda16e32c3b1ecc9789e015b162b21bcad3af05c0ca87057472211 (block 51155054)
+    RPC        : public Base mainnet (https://mainnet.base.org)
+    result     : ✅ PASS — merkle_root confirmed on Base mainnet
+
+═══════════════════════════════════════════════════════════
+ ✅  VERIFIED
+
+    This receipt independently confirms that the payload_hash
+    committed by compliance-agent-v2 at
+    2026-09-11T04:03:20.351Z was
+    anchored on Base mainnet (tx 0x9f85ade9c5fda16e…)
+    and has not been tampered with.
+═══════════════════════════════════════════════════════════
+
+Exit code (expect 0): 0
+
+--- Verify tampered (clean dir) ---
+
+═══════════════════════════════════════════════════════════
+ FairSeal Receipt Verification
+═══════════════════════════════════════════════════════════
+ Receipt ID : nr_04d7de00519cbf2b86ffa2e911ac01d8
+ Status     : anchored
+ Agent ID   : compliance-agent-v2
+ Decided At : 2026-09-11T04:03:20.351Z
+═══════════════════════════════════════════════════════════
+
+[1] Leaf recompute (node:crypto — independent of server)
+    formula    : SHA256("nr_04d7de00519cbf2b86ffa2e911ac01d8" + "||" + "<payload_hash>")
+    expected   : 52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859
+    computed   : fcb4c788eab2fc8d7413411d2b47102ffc693c976e7286e1ecc7f5ccf24e974e
+    result     : ❌ FAIL — payload_hash mismatch (receipt may be forged)
+
+[2] Merkle path (@fairseal/verify verifyMerklePath + pair-sorted fallback)
+    path length: 0
+    detail     : single-leaf batch: recomputed leaf must equal merkle_root
+    merkle_root: 52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859
+    result     : ❌ FAIL — leaf not in tree (receipt may be forged)
+
+[3] On-chain anchor (@fairseal/verify verifyAnchor — Base mainnet)
+    contract   : 0xEE09671Bbc6B932BF1461CAff360bfDD9bEA55ca
+    batch_id   : fairseal-notary-batch-1789099451722-3
+    anchor_tx  : 0x9f85ade9c5fda16e32c3b1ecc9789e015b162b21bcad3af05c0ca87057472211 (block 51155054)
+    RPC        : public Base mainnet (https://mainnet.base.org)
+    result     : ✅ PASS — merkle_root confirmed on Base mainnet
+
+═══════════════════════════════════════════════════════════
+ ❌  VERIFICATION FAILED
+
+    • payload_hash does not match the committed leaf
+    • merkle path does not resolve to the claimed root
+
+    This receipt should be treated as invalid.
+═══════════════════════════════════════════════════════════
+
+Exit code (expect 1): 1
+
+══════════════════════════════════════════════════════════════════
+SUMMARY
+══════════════════════════════════════════════════════════════════
+Test 1 (real receipt):     PASS — all 3 checks green, exit 0
+Test 2 (tampered receipt): PASS — checks 1+2 fail, exit 1 (fail-closed)
+Test 3 (clean dir):        PASS — npm install + README steps run correctly
+
+Untested legs: NONE — all three paths verified with real Base mainnet RPC
+               (on-chain getBatchRoot call confirmed live each run)

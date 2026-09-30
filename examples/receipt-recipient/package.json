@@ -1,0 +1,18 @@
+{
+  "name": "fairseal-receipt-recipient",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "FairSeal notarize receipt — independent verification for downstream agents and auditors (zero wallet, zero payment)",
+  "main": "verify-receipt.mjs",
+  "scripts": {
+    "verify": "node verify-receipt.mjs fixtures/receipt-real.json",
+    "verify:tamper": "node verify-receipt.mjs fixtures/receipt-tampered.json"
+  },
+  "dependencies": {
+    "@fairseal/verify": "0.4.1",
+    "viem": "^2.56.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
