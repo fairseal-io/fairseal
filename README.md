@@ -6,7 +6,6 @@ Fairseal creates verifiable receipts (CSRs) proving that a selection was committ
 
 [![@fairseal/commit](https://img.shields.io/npm/v/@fairseal/commit?label=%40fairseal%2Fcommit&color=3ecf8e)](https://www.npmjs.com/package/@fairseal/commit)
 [![@fairseal/core](https://img.shields.io/npm/v/@fairseal/core?label=%40fairseal%2Fcore&color=3b82f6)](https://www.npmjs.com/package/@fairseal/core)
-[![Tests](https://img.shields.io/badge/tests-32%20passing-3ecf8e)](#)
 
 ---
 
