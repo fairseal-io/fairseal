@@ -50,7 +50,7 @@ const proof = await verifyReceipt(receipt); // ✅ PARTIAL
 1. **Commit** — Lock your drop table + player ID into a hash before the randomness exists
 2. **Entropy** — Wait for a public drand beacon round (Cloudflare + Protocol Labs)
 3. **Resolve** — Derive the selection from beacon entropy + your committed rule
-4. **Verify** — Anyone can re-run every step. BLS12-381 cryptographic verification. No trust required.
+4. **Verify** — Anyone can re-run every step. drand beacon signatures are BLS12-381-verified; FairSeal receipt signatures use EIP-191 (secp256k1) / Ed25519 — receipts are never BLS-signed. No trust required.
 
 ## Performance
 
@@ -58,7 +58,7 @@ const proof = await verifyReceipt(receipt); // ✅ PARTIAL
 |---|---|
 | Commitment creation | **0.006ms** (170,000+/sec) |
 | Beacon fetch | **~200ms** |
-| BLS verification | **~150ms** |
+| drand beacon verification (BLS12-381) | **~150ms** |
 | Receipt size | **0.9 KB** |
 
 Client-side. No server. No account. No fees for PARTIAL verification.
