@@ -82,6 +82,19 @@ Client-side. No server. No account. No fees for PARTIAL verification.
 | NFT mint order | Queue provably fair — no insider front-running. |
 | Slot machines | Seed Commitment Model — verifiable spins, no nonce chain. |
 
+## Result Notarization vs. Activity Receipts
+
+Most "agent receipts" today are **activity receipts**: the platform logs what an agent did, and you trust whoever wrote the log. Fairseal receipts are **result notarization** — a different trust model:
+
+| | Activity receipts (platform logs) | Fairseal result notarization |
+|---|---|---|
+| Who do you trust? | The operator writing the log | No one — receipts verify offline |
+| What is proven? | That an action was recorded | That a result was committed **before the outcome was knowable** |
+| Time proof | Server timestamp (operator-controlled) | External anchor on Base (independently checkable) |
+| Tamper evidence | Depends on log integrity | Hash-anchored; any modification breaks verification |
+
+Related standards: payment-authorization protocols like Google/Mastercard **AP2** (mandates), Visa **TAP**, and OpenAI/Stripe **ACP** prove that an agent *may* act and *who* it is. Fairseal proves *what happened* — that a result was committed and hasn't been altered since. Fairseal settles micropayments over Coinbase's **x402** and does not implement AP2/TAP/ACP; the layers are complementary.
+
 ## Links
 
 - 🌐 [fairseal.io](https://fairseal.io) — Landing page
