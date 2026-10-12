@@ -70,6 +70,7 @@ Client-side. No server. No account. No fees for PARTIAL verification.
 | [`@fairseal/commit`](packages/commit) | Committed selection receipts. Core library. |
 | [`@fairseal/core`](packages/core) | Cryptographic primitives, signing, Merkle trees. |
 | [`@fairseal/verify`](packages/verify) | Independent receipt verification. |
+| [`@fairseal/mcp-server`](packages/mcp-server) | **MCP server for AI agents.** Verifiable entropy, provably-fair games, cryptographic receipt verification via Model Context Protocol. |
 
 ## Use Cases
 

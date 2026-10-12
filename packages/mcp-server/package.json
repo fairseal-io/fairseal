@@ -1,0 +1,57 @@
+{
+  "name": "@fairseal/mcp-server",
+  "version": "0.2.5",
+  "mcpName": "io.fairseal/mcp-server",
+  "description": "MCP server for FairSeal — verifiable entropy, provably-fair games, and cryptographic receipt verification for AI agents (stdio transport).",
+  "type": "module",
+  "bin": {
+    "fairseal-mcp-server": "dist/server.js"
+  },
+  "main": "dist/server.js",
+  "files": [
+    "dist",
+    "README.md",
+    "QUICKSTART.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/smoke.mjs",
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "fairseal",
+    "verifiable-randomness",
+    "vdf",
+    "provably-fair",
+    "entropy",
+    "ai-agents",
+    "x402",
+    "receipts"
+  ],
+  "author": "FairSeal (https://fairseal.io)",
+  "license": "MIT",
+  "homepage": "https://fairseal.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fairseal-io/fairseal.git",
+    "directory": "packages/mcp-server"
+  },
+  "bugs": {
+    "url": "https://github.com/ned-del/fairseal/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@fairseal/verify": "^0.4.2",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^7.0.2"
+  }
+}
