@@ -1,0 +1,27 @@
+{
+  "receipt_id": "nr_04d7de00519cbf2b86ffa2e911ac01d8",
+  "schema": "agent_decision",
+  "payload_hash": "25bec1d10b9eb2d4a9da33a3d6c5f3d2070c6882c3cdaf97d07fa1f2af85cf14",
+  "metadata": {
+    "agent_id": "compliance-agent-v2",
+    "decided_at": "2026-09-11T04:03:20.351Z",
+    "input_hash": "18ec6992a727d8eeeb21eaf13d6d2b9b618f116122830e51671a55873f6c514d",
+    "decision_hash": "b54246ff3cffa3773af6ddd5247a23def61ca9147e515f655ba1cb723d3e795b"
+  },
+  "created_at": "2026-09-11T04:03:20.686Z",
+  "status": "anchored",
+  "proof": {
+    "leaf_hash": "52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859",
+    "leaf_formula": "SHA256(receipt_id + '||' + payload_hash) — hex-as-text",
+    "merkle_path": [],
+    "merkle_root": "52fc791607fa313ba4cdadfb1ba5d394e63c6dec73deb6b657e68c9f17ff9859",
+    "pair_formula": "node = SHA256(min(node,sib) + max(node,sib)) — pair sorted lexicographically, hex-as-text",
+    "batch_id": "fairseal-notary-batch-1789099451722-3",
+    "anchor_tx": "0x9f85ade9c5fda16e32c3b1ecc9789e015b162b21bcad3af05c0ca87057472211",
+    "anchor_block": 51155054,
+    "anchored_at": "2026-09-11T04:04:17.206Z",
+    "anchor_chain": "base",
+    "anchor_chain_id": 8453,
+    "anchor_contract": "0xEE09671Bbc6B932BF1461CAff360bfDD9bEA55ca"
+  }
+}

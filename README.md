@@ -6,7 +6,6 @@ Fairseal creates verifiable receipts (CSRs) proving that a selection was committ
 
 [![@fairseal/commit](https://img.shields.io/npm/v/@fairseal/commit?label=%40fairseal%2Fcommit&color=3ecf8e)](https://www.npmjs.com/package/@fairseal/commit)
 [![@fairseal/core](https://img.shields.io/npm/v/@fairseal/core?label=%40fairseal%2Fcore&color=3b82f6)](https://www.npmjs.com/package/@fairseal/core)
-[![Tests](https://img.shields.io/badge/tests-32%20passing-3ecf8e)](#)
 
 ---
 
@@ -50,7 +49,7 @@ const proof = await verifyReceipt(receipt); // ✅ PARTIAL
 1. **Commit** — Lock your drop table + player ID into a hash before the randomness exists
 2. **Entropy** — Wait for a public drand beacon round (Cloudflare + Protocol Labs)
 3. **Resolve** — Derive the selection from beacon entropy + your committed rule
-4. **Verify** — Anyone can re-run every step. BLS12-381 cryptographic verification. No trust required.
+4. **Verify** — Anyone can re-run every step. drand beacon signatures are BLS12-381-verified; FairSeal receipt signatures use EIP-191 (secp256k1) / Ed25519 — receipts are never BLS-signed. No trust required.
 
 ## Performance
 
@@ -58,7 +57,7 @@ const proof = await verifyReceipt(receipt); // ✅ PARTIAL
 |---|---|
 | Commitment creation | **0.006ms** (170,000+/sec) |
 | Beacon fetch | **~200ms** |
-| BLS verification | **~150ms** |
+| drand beacon verification (BLS12-381) | **~150ms** |
 | Receipt size | **0.9 KB** |
 
 Client-side. No server. No account. No fees for PARTIAL verification.
@@ -71,6 +70,7 @@ Client-side. No server. No account. No fees for PARTIAL verification.
 | [`@fairseal/commit`](packages/commit) | Committed selection receipts. Core library. |
 | [`@fairseal/core`](packages/core) | Cryptographic primitives, signing, Merkle trees. |
 | [`@fairseal/verify`](packages/verify) | Independent receipt verification. |
+| [`@fairseal/mcp-server`](packages/mcp-server) | **MCP server for AI agents.** Verifiable entropy, provably-fair games, cryptographic receipt verification via Model Context Protocol. |
 
 ## Use Cases
 
@@ -82,6 +82,19 @@ Client-side. No server. No account. No fees for PARTIAL verification.
 | Tournament brackets | Seeding provably random, not rigged. |
 | NFT mint order | Queue provably fair — no insider front-running. |
 | Slot machines | Seed Commitment Model — verifiable spins, no nonce chain. |
+
+## Result Notarization vs. Activity Receipts
+
+Most "agent receipts" today are **activity receipts**: the platform logs what an agent did, and you trust whoever wrote the log. Fairseal receipts are **result notarization** — a different trust model:
+
+| | Activity receipts (platform logs) | Fairseal result notarization |
+|---|---|---|
+| Who do you trust? | The operator writing the log | No one — receipts verify offline |
+| What is proven? | That an action was recorded | That a result was committed **before the outcome was knowable** |
+| Time proof | Server timestamp (operator-controlled) | External anchor on Base (independently checkable) |
+| Tamper evidence | Depends on log integrity | Hash-anchored; any modification breaks verification |
+
+Related standards: payment-authorization protocols like Google/Mastercard **AP2** (mandates), Visa **TAP**, and OpenAI/Stripe **ACP** prove that an agent *may* act and *who* it is. Fairseal proves *what happened* — that a result was committed and hasn't been altered since. Fairseal settles micropayments over Coinbase's **x402** and does not implement AP2/TAP/ACP; the layers are complementary.
 
 ## Links
 
