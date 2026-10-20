@@ -103,6 +103,10 @@ Related standards: payment-authorization protocols like Google/Mastercard **AP2*
 - 🔍 [verify.fairseal.io](https://verify.fairseal.io) — Receipt verifier
 - 📖 [@fairseal/commit README](packages/commit/README.md) — Full documentation
 
+## Listings
+
+- [PayAPI Market — FairSeal Cryptographic Receipts API](https://payapi.market/api/fairseal-cryptographic-receipts-api) — verified listing (settled on-chain test payment)
+
 ## License
 
 MIT — [Fairseal](https://fairseal.io)
